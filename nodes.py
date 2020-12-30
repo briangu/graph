@@ -397,6 +397,25 @@ def test_stream_node():
 
     [print(x) for x in root]
 
+    print("running timer node")
+
+    class TimerNode(StreamNode):
+        def __init__(self, name, count, duration, cost = 0):
+            super().__init__(name, cost = cost)   
+            self.count = count
+            self.duration = duration
+
+        def apply(self):
+            for i in range(self.count):
+                time.sleep(self.duration)
+                yield i
+
+    aNode = TimerNode("a", 10, 1, cost = 1)
+    bNode = RangeNode("b", 20, 30, cost = 1)
+    root = SumNode("c", [aNode, bNode], cost = 3)
+    [print(x) for x in root]
+
+
 
 #test_sync_node()
 #test_async_node()
