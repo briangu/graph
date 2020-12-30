@@ -1,6 +1,20 @@
 import asyncio
 import numpy as np
 
+
+#todo:
+# add either a generic way to pass types in or dict or just use typed sub-classes
+# time parameters for graph operations can be at the node level,
+# essentially just build the graph you need with time params appropriately set for each subgraph
+
+# identifying reused nodes and topologically sorting according to base nodes -or failing
+# streaming
+
+# 3 kinds of nodes
+# synchronous
+# async
+# streaming
+
 class Node():
     def __init__(self, name, cost = 0, dependencies = []):
         self.name = name
@@ -8,6 +22,13 @@ class Node():
         self.node_cost = cost
 
     def __iter__(self):
+        def recursive_iter(node):
+            yield node
+            for d in node.dependencies:
+                yield from recursive_iter(d)
+        yield from recursive_iter(self)
+
+    def graph():
         def recursive_iter(node):
             yield node
             for d in node.dependencies:
@@ -35,6 +56,7 @@ class Node():
         tasks = self.dependency_tasks() 
         res = await asyncio.gather(*tasks)
         return await self.post_process(res)
+
 
 class MinCostNode(Node):
     def min_dependency(self):
