@@ -51,6 +51,34 @@ class MinCostNode(Node):
         v, i = self.min_dependency()
         return v
 
+class CacheNode(Node):
+
+    internal_cache = None
+
+    def __init__(self, name, dependency, cost = 0):
+        super().__init__(name, dependencies=[dependency], cost = cost)   
+
+    def cost(self):
+        return self.process_cost() + self.dependencies_cost() if not self.internal_cache else 0
+
+    async def post_process(self, res):
+        print("post process: {} {}".format(self.name, res))
+        self.internal_cache = res
+        return res
+
+    async def fetch_cache(self):
+        res = self.internal_cache
+        print("use cache: {} {}".format(self.name, res))
+        return res
+
+    async def apply(self):
+        if not self.internal_cache:
+            tasks = self.dependency_tasks() 
+            res = await asyncio.gather(*tasks)
+            return await self.post_process(res)    
+        else:
+            return await self.fetch_cache()
+
 def print_nodes(n, indent = "", siblingCount = 0):
     if siblingCount > 1:
         child_indent = indent + "|"
@@ -99,22 +127,34 @@ print("total cost: {}".format(root.cost()))
 
 [print(d.name) for d in root]
 
-print("running graph:")
+# print("running graph:")
 
-async def foo(node):
-    await node.apply()
-    print("{}: {}".format(node.name, node.process_cost()))
+# async def foo(node):
+#     await node.apply()
+#     print("{}: {}".format(node.name, node.process_cost()))
 
 async def run_graph(root):
     await root.apply()
 
-asyncio.run(run_graph(root))
+# asyncio.run(run_graph(root))
 
-print("running min graph")
+# print("running min graph")
 
-sb1Node = Node("sb1", cost = 0)
-sb2bNode = Node("sb2", cost = 2)
-bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+# sb1Node = Node("sb1", cost = 0)
+# sb2bNode = Node("sb2", cost = 2)
+# bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+# root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
+
+# asyncio.run(run_graph(root))
+
+sb1Node = Node("sb1", cost = 10)
+sb2Node = CacheNode("sb2-cache", sb1Node, cost = 0)
+bNode = Node("b", cost = 2, dependencies = [sb2Node])
 root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
+print("running with cache node: pass 1")
+print("total cost: {}".format(root.cost()))
+asyncio.run(run_graph(root))
+print("running with cache node: pass 2")
+print("total cost: {}".format(root.cost()))
 asyncio.run(run_graph(root))
