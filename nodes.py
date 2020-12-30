@@ -36,17 +36,20 @@ class Node():
         res = await asyncio.gather(*tasks)
         return await self.post_process(res)
 
-# class MinCostNode(Node):
-#     def apply(self):
-#         process_task = asyncio.sleep(self.cost())
-#         c, i = self.min_dependency()
-#         min_dep = self.dependencies[i]
-#         tasks = [min_node.apply()]
-#         return asyncio.gather(*tasks).add_done_callback(process_task)
-    # def min_dependency(self):
-    #     if not self.dependencies:
-    #         return 0, None
-    #     return min((n.cost(), i) for (i, n) in enumerate(self.dependencies))
+class MinCostNode(Node):
+    def min_dependency(self):
+        if not self.dependencies:
+            return 0, None
+        return min((n.cost(), i) for (i, n) in enumerate(self.dependencies))
+
+    def dependency_tasks(self):
+        v, i = self.min_dependency()
+        min_dep = self.dependencies[i]
+        return [min_dep.apply()]
+
+    def dependencies_cost(self):
+        v, i = self.min_dependency()
+        return v
 
 def print_nodes(n, indent = "", siblingCount = 0):
     if siblingCount > 1:
@@ -107,3 +110,11 @@ async def run_graph(root):
 
 asyncio.run(run_graph(root))
 
+print("running min graph")
+
+sb1Node = Node("sb1", cost = 0)
+sb2bNode = Node("sb2", cost = 2)
+bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
+
+asyncio.run(run_graph(root))
