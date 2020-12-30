@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import numpy as np
 import time
 
@@ -98,6 +99,33 @@ class AsyncNode(Node):
         tasks = self.dependency_tasks() 
         res = await asyncio.gather(*tasks)
         return await self.post_process(res)
+
+
+class StreamNode(Node):
+    def __init__(self, name, cost = 0, dependencies = []):
+        self.name = name
+        self.dependencies = dependencies
+        self.node_cost = cost
+
+    def __iter__(self):
+        yield from self.apply()
+
+    def dependency_tasks(self):
+        return [d.apply() for d in self.dependencies]
+
+    def post_process(self, res):
+        print("post process: {}".format(self.name))
+        time.sleep(self.process_cost() / 10)
+        return res
+
+    def apply(self):
+        for q in itertools.zip_longest(*self.dependency_tasks()):
+            res = self.post_process(q)
+            # if hasattr(res, "__len__") and len(res) > 0:
+            #     yield from res
+            # else:
+            #     yield res
+            yield res
 
 
 class MinCostNode(Node):
@@ -267,9 +295,6 @@ def test_async_node():
     print_nodes(root)
 
     adj_matrix = build_adj_matrix(root, node_map)
-    print(adj_matrix)
-
-    print("total cost: {}".format(root.cost()))
 
     [print(d.name) for d in root]
 
@@ -305,5 +330,74 @@ def test_async_node():
     print("total cost: {}".format(root.cost()))
     asyncio.run(run_graph(root))
 
+def test_stream_node():
+    print("-"*20)
+    print("testing async node graphs:")
+    print("-"*20)
+
+    class RangeNode(StreamNode):
+        def __init__(self, name, b, e, cost = 0):
+            super().__init__(name, cost = cost)   
+            self.b = b
+            self.e = e
+
+        def apply(self):
+            for i in range(self.b,self.e):
+                yield i
+
+    class SumNode(StreamNode):
+        def __init__(self, name, dependencies, cost = 0):
+            super().__init__(name, dependencies = dependencies, cost = cost)   
+
+        def post_process(self, r):
+            val = sum([x or 0 for x in r])
+            print("adding: {} = {}".format(r, val))
+            return val
+
+    root = RangeNode("a", 1, 10, cost = 1)
+    print("running range graph:")
+    [print(x) for x in root]
+
+    print("running sum graph:")
+
+    aNode = RangeNode("a", 1, 10, cost = 1)
+    bNode = RangeNode("b", 20, 30, cost = 1)
+    root = SumNode("c", [aNode, bNode], cost = 3)
+
+    print("total cost: {}".format(root.cost()))
+
+    [print(x) for x in root]
+
+    print("running double sum chains")
+
+    aNode = RangeNode("a", 0, 10, cost = 1)
+    bNode = RangeNode("b", 20, 30, cost = 1)
+    cNode = SumNode("c", [aNode, bNode], cost = 3)
+
+    dNode = RangeNode("d", 100, 110, cost = 1)
+    eNode = RangeNode("e", 200, 210, cost = 1)
+    fNode = SumNode("f", [dNode, eNode], cost = 3)
+
+    gNode = SumNode("g", [cNode, fNode], cost = 10)
+    root = StreamNode("h", dependencies=[gNode])
+
+    [print(x) for x in root]
+
+    print("running tuple chains")
+
+    aNode = RangeNode("a", 0, 10, cost = 1)
+    bNode = RangeNode("b", 20, 30, cost = 1)
+    cNode = SumNode("c", [aNode, bNode], cost = 3)
+
+    dNode = RangeNode("d", 100, 110, cost = 1)
+    eNode = RangeNode("e", 200, 210, cost = 1)
+    fNode = SumNode("f", [dNode, eNode], cost = 3)
+
+    root = StreamNode("g", dependencies=[cNode, fNode])
+
+    [print(x) for x in root]
+
+
 #test_sync_node()
-test_async_node()
+#test_async_node()
+test_stream_node()
