@@ -14,27 +14,46 @@ class Node():
                 yield from recursive_iter(d)
         yield from recursive_iter(self)
 
+    def dependency_tasks(self):
+        return [d.apply() for d in self.dependencies]
+
     def dependencies_cost(self):
-        return sum([d.total_cost() for d in self.dependencies])
+        return sum([d.cost() for d in self.dependencies])
 
-    def total_cost(self):
-        return self.node_cost + self.dependencies_cost()
-
-    def cost(self):
+    def process_cost(self):
         return self.node_cost
 
-    def apply(self):
-        process_task = asyncio.sleep(self.cost())
-        dependency_tasks = [d.apply() for d in self.dependencies]
-        tasks = [process_task] + dependency_tasks
-        return asyncio.gather(*tasks)
+    def cost(self):
+        return self.process_cost() + self.dependencies_cost()
+
+    async def post_process(self, res):
+        print("post process: {} {}".format(self.name, res))
+        await asyncio.sleep(self.process_cost())
+        return self.name
+
+    async def apply(self):
+        tasks = self.dependency_tasks() 
+        res = await asyncio.gather(*tasks)
+        return await self.post_process(res)
+
+# class MinCostNode(Node):
+#     def apply(self):
+#         process_task = asyncio.sleep(self.cost())
+#         c, i = self.min_dependency()
+#         min_dep = self.dependencies[i]
+#         tasks = [min_node.apply()]
+#         return asyncio.gather(*tasks).add_done_callback(process_task)
+    # def min_dependency(self):
+    #     if not self.dependencies:
+    #         return 0, None
+    #     return min((n.cost(), i) for (i, n) in enumerate(self.dependencies))
 
 def print_nodes(n, indent = "", siblingCount = 0):
     if siblingCount > 1:
         child_indent = indent + "|"
     else:
         child_indent = indent + " "
-    print("{}{} [{}:{}+{}]".format(indent, n.name, n.total_cost(), n.cost(), n.dependencies_cost()))
+    print("{}{} [{}:{}+{}]".format(indent, n.name, n.cost(), n.process_cost(), n.dependencies_cost()))
     [print_nodes(d, child_indent, len(n.dependencies)) for d in n.dependencies]
 
 def count_nodes(node):
@@ -73,7 +92,7 @@ print_nodes(root)
 adj_matrix = build_adj_matrix(root, node_map)
 print(adj_matrix)
 
-print("total cost: {}".format(root.total_cost()))
+print("total cost: {}".format(root.cost()))
 
 [print(d.name) for d in root]
 
@@ -81,11 +100,10 @@ print("running graph:")
 
 async def foo(node):
     await node.apply()
-    print("{}: {}".format(node.name, node.cost()))
+    print("{}: {}".format(node.name, node.process_cost()))
 
 async def run_graph(root):
-    tasks = [foo(d) for d in root]
-    await asyncio.gather(*tasks)
+    await root.apply()
 
 asyncio.run(run_graph(root))
 
