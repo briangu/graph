@@ -1,6 +1,6 @@
 import asyncio
 import numpy as np
-
+import time
 
 #todo:
 # add either a generic way to pass types in or dict or just use typed sub-classes
@@ -47,9 +47,51 @@ class Node():
     def cost(self):
         return self.process_cost() + self.dependencies_cost()
 
+    def post_process(self, res):
+        print("post process: {} {}".format(self.name, res))
+        time.sleep(self.process_cost() / 10)
+        return self.name
+
+    def apply(self):
+        task_results = self.dependency_tasks() 
+        return self.post_process(task_results)
+
+
+class AsyncNode(Node):
+    def __init__(self, name, cost = 0, dependencies = []):
+        self.name = name
+        self.dependencies = dependencies
+        self.node_cost = cost
+
+    def __iter__(self):
+        def recursive_iter(node):
+            yield node
+            for d in node.dependencies:
+                yield from recursive_iter(d)
+        yield from recursive_iter(self)
+
+    def graph():
+        def recursive_iter(node):
+            yield node
+            for d in node.dependencies:
+                yield from recursive_iter(d)
+        yield from recursive_iter(self)
+
+    def dependency_tasks(self):
+        return [d.apply() for d in self.dependencies]
+
+    def dependencies_cost(self):
+        return sum([d.cost() for d in self.dependencies])
+
+    def process_cost(self):
+        return self.node_cost
+
+    def cost(self):
+        return self.process_cost() + self.dependencies_cost()
+
     async def post_process(self, res):
         print("post process: {} {}".format(self.name, res))
-        await asyncio.sleep(self.process_cost())
+        await asyncio.sleep(self.process_cost() / 10)
         return self.name
 
     async def apply(self):
@@ -73,6 +115,9 @@ class MinCostNode(Node):
         v, i = self.min_dependency()
         return v
 
+class MinCostAsyncNode(MinCostNode, AsyncNode):
+    pass
+
 class CacheNode(Node):
 
     internal_cache = None
@@ -83,23 +128,42 @@ class CacheNode(Node):
     def cost(self):
         return self.process_cost() + self.dependencies_cost() if not self.internal_cache else 0
 
-    async def post_process(self, res):
-        print("post process: {} {}".format(self.name, res))
-        self.internal_cache = res
-        return res
+    def set_cache(self, val):
+        print("set cache: {} {}".format(self.name, val))
+        self.internal_cache = val
+        return val
 
-    async def fetch_cache(self):
-        res = self.internal_cache
-        print("use cache: {} {}".format(self.name, res))
-        return res
+    def get_cache(self):
+        val = self.internal_cache
+        print("get cache: {} {}".format(self.name, val))
+        return val
+
+    def apply(self):
+        return self.get_cache() if self.internal_cache else self.set_cache(super().apply())
+
+class CacheAsyncNode(AsyncNode):
+
+    internal_cache = None
+
+    def __init__(self, name, dependency, cost = 0):
+        super().__init__(name, dependencies=[dependency], cost = cost)   
+
+    def cost(self):
+        return self.process_cost() + self.dependencies_cost() if not self.internal_cache else 0
+
+    async def set_cache(self, val):
+        print("set cache: {} {}".format(self.name, val))
+        self.internal_cache = val
+        return val
+
+    async def get_cache(self):
+        val = self.internal_cache
+        print("get cache: {} {}".format(self.name, val))
+        return val
 
     async def apply(self):
-        if not self.internal_cache:
-            tasks = self.dependency_tasks() 
-            res = await asyncio.gather(*tasks)
-            return await self.post_process(res)    
-        else:
-            return await self.fetch_cache()
+        return await self.get_cache() if self.internal_cache else await self.set_cache(await super().apply())
+
 
 def print_nodes(n, indent = "", siblingCount = 0):
     if siblingCount > 1:
@@ -125,58 +189,121 @@ def build_adj_matrix(node, node_map, adj_mat = None):
             adj_mat[m,node_map[d.name]] = d.cost()
     return adj_mat
 
-aNode = Node("a", 1)
-sb1Node = Node("sb1", cost = 0)
-sb2bNode = Node("sb2", cost = 2)
-bNode = Node("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-cNode = Node("c", cost = 4, dependencies = [aNode])
-dNode = Node("d", cost = 3)
-eNode = Node("e", cost = 1, dependencies = [cNode, dNode])
-fNode = Node("f", cost = 5)
-root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
+def test_sync_node():
+    print("-"*20)
+    print("testing sync node graphs:")
+    print("-"*20)
 
-node_map = map_nodes(root)
-n = len(node_map.keys())
+    aNode = Node("a", 1)
+    sb1Node = Node("sb1", cost = 0)
+    sb2bNode = Node("sb2", cost = 2)
+    bNode = Node("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+    cNode = Node("c", cost = 4, dependencies = [aNode])
+    dNode = Node("d", cost = 3)
+    eNode = Node("e", cost = 1, dependencies = [cNode, dNode])
+    fNode = Node("f", cost = 5)
+    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
-print("node count: {}".format(n))
-print(node_map)
-print_nodes(root)
+    node_map = map_nodes(root)
+    n = len(node_map.keys())
 
-adj_matrix = build_adj_matrix(root, node_map)
-print(adj_matrix)
+    print("node count: {}".format(n))
+    print(node_map)
+    print_nodes(root)
 
-print("total cost: {}".format(root.cost()))
+    adj_matrix = build_adj_matrix(root, node_map)
+    print(adj_matrix)
 
-[print(d.name) for d in root]
+    print("total cost: {}".format(root.cost()))
 
-# print("running graph:")
+    [print(d.name) for d in root]
 
-# async def foo(node):
-#     await node.apply()
-#     print("{}: {}".format(node.name, node.process_cost()))
+    print("running graph:")
 
-async def run_graph(root):
-    await root.apply()
+    root.apply()
 
-# asyncio.run(run_graph(root))
+    print("running min graph")
 
-# print("running min graph")
+    sb1Node = Node("sb1", cost = 0)
+    sb2bNode = Node("sb2", cost = 2)
+    bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
-# sb1Node = Node("sb1", cost = 0)
-# sb2bNode = Node("sb2", cost = 2)
-# bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-# root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
+    root.apply()
 
-# asyncio.run(run_graph(root))
+    sb1Node = Node("sb1", cost = 10)
+    sb2Node = CacheNode("sb2-cache", sb1Node, cost = 0)
+    bNode = Node("b", cost = 2, dependencies = [sb2Node])
+    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
-sb1Node = Node("sb1", cost = 10)
-sb2Node = CacheNode("sb2-cache", sb1Node, cost = 0)
-bNode = Node("b", cost = 2, dependencies = [sb2Node])
-root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
+    print("running with cache node: pass 1")
+    print("total cost: {}".format(root.cost()))
+    root.apply()
+    print("running with cache node: pass 2")
+    print("total cost: {}".format(root.cost()))
+    root.apply()
 
-print("running with cache node: pass 1")
-print("total cost: {}".format(root.cost()))
-asyncio.run(run_graph(root))
-print("running with cache node: pass 2")
-print("total cost: {}".format(root.cost()))
-asyncio.run(run_graph(root))
+
+def test_async_node():
+    print("-"*20)
+    print("testing async node graphs:")
+    print("-"*20)
+
+    aNode = AsyncNode("a", 1)
+    sb1Node = AsyncNode("sb1", cost = 0)
+    sb2bNode = AsyncNode("sb2", cost = 2)
+    bNode = AsyncNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+    cNode = AsyncNode("c", cost = 4, dependencies = [aNode])
+    dNode = AsyncNode("d", cost = 3)
+    eNode = AsyncNode("e", cost = 1, dependencies = [cNode, dNode])
+    fNode = AsyncNode("f", cost = 5)
+    root = AsyncNode("h", cost = 1, dependencies = [eNode, fNode, bNode])
+
+    node_map = map_nodes(root)
+    n = len(node_map.keys())
+
+    print("node count: {}".format(n))
+    print(node_map)
+    print_nodes(root)
+
+    adj_matrix = build_adj_matrix(root, node_map)
+    print(adj_matrix)
+
+    print("total cost: {}".format(root.cost()))
+
+    [print(d.name) for d in root]
+
+    print("running graph:")
+
+    # async def foo(node):
+    #     await node.apply()
+    #     print("{}: {}".format(node.name, node.process_cost()))
+
+    async def run_graph(root):
+        await root.apply()
+
+    asyncio.run(run_graph(root))
+
+    print("running min graph")
+
+    sb1Node = AsyncNode("sb1", cost = 0)
+    sb2bNode = AsyncNode("sb2", cost = 2)
+    bNode = MinCostAsyncNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+    root = AsyncNode("h", cost = 1, dependencies = [eNode, fNode, bNode])
+
+    asyncio.run(run_graph(root))
+
+    sb1Node = AsyncNode("sb1", cost = 10)
+    sb2Node = CacheAsyncNode("sb2-cache", sb1Node, cost = 0)
+    bNode = AsyncNode("b", cost = 2, dependencies = [sb2Node])
+    root = AsyncNode("h", cost = 1, dependencies = [eNode, fNode, bNode])
+
+    print("running with cache node: pass 1")
+    print("total cost: {}".format(root.cost()))
+    asyncio.run(run_graph(root))
+    print("running with cache node: pass 2")
+    print("total cost: {}".format(root.cost()))
+    asyncio.run(run_graph(root))
+
+#test_sync_node()
+test_async_node()
