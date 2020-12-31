@@ -9,7 +9,9 @@ import time
 # essentially just build the graph you need with time params appropriately set for each subgraph
 
 # identifying reused nodes and topologically sorting according to base nodes -or failing
-# streaming
+
+# debug injection walker
+# sleep injection walker
 
 # 3 kinds of nodes
 # synchronous
@@ -17,19 +19,16 @@ import time
 # streaming
 
 class Node():
-    def __init__(self, name, cost = 0, dependencies = []):
+    def __init__(self, name, cost = 0, dependencies = [], fn = None):
         self.name = name
         self.dependencies = dependencies
         self.node_cost = cost
+        self.fn = fn
 
     def __iter__(self):
-        def recursive_iter(node):
-            yield node
-            for d in node.dependencies:
-                yield from recursive_iter(d)
-        yield from recursive_iter(self)
+        return self.traverse()
 
-    def graph():
+    def traverse(self):
         def recursive_iter(node):
             yield node
             for d in node.dependencies:
@@ -50,8 +49,9 @@ class Node():
 
     def post_process(self, res):
         print("post process: {} {}".format(self.name, res))
-        time.sleep(self.process_cost() / 10)
-        return self.name
+        # if not self.fn:
+        #     time.sleep(self.process_cost() / 10)
+        return self.fn(res) if self.fn else self.name if not res else res
 
     def apply(self):
         task_results = self.dependency_tasks() 
@@ -59,41 +59,14 @@ class Node():
 
 
 class AsyncNode(Node):
-    def __init__(self, name, cost = 0, dependencies = []):
-        self.name = name
-        self.dependencies = dependencies
-        self.node_cost = cost
-
-    def __iter__(self):
-        def recursive_iter(node):
-            yield node
-            for d in node.dependencies:
-                yield from recursive_iter(d)
-        yield from recursive_iter(self)
-
-    def graph():
-        def recursive_iter(node):
-            yield node
-            for d in node.dependencies:
-                yield from recursive_iter(d)
-        yield from recursive_iter(self)
-
-    def dependency_tasks(self):
-        return [d.apply() for d in self.dependencies]
-
-    def dependencies_cost(self):
-        return sum([d.cost() for d in self.dependencies])
-
-    def process_cost(self):
-        return self.node_cost
-
-    def cost(self):
-        return self.process_cost() + self.dependencies_cost()
+    def __init__(self, name, cost = 0, dependencies = [], fn = None):
+        super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
 
     async def post_process(self, res):
         print("post process: {} {}".format(self.name, res))
-        await asyncio.sleep(self.process_cost() / 10)
-        return self.name
+        # if not self.fn:
+        #     await asyncio.sleep(self.process_cost() / 10)
+        return await self.fn(res) if self.fn else self.name if not res else res
 
     async def apply(self):
         tasks = self.dependency_tasks() 
@@ -102,30 +75,19 @@ class AsyncNode(Node):
 
 
 class StreamNode(Node):
-    def __init__(self, name, cost = 0, dependencies = []):
-        self.name = name
-        self.dependencies = dependencies
-        self.node_cost = cost
+    def __init__(self, name, cost = 0, dependencies = [], fn = None):
+        super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
 
     def __iter__(self):
         yield from self.apply()
 
-    def dependency_tasks(self):
-        return [d.apply() for d in self.dependencies]
-
     def post_process(self, res):
-        print("post process: {}".format(self.name))
-        time.sleep(self.process_cost() / 10)
-        return res
+        # print("post process: {} {}".format(self.name, res))
+        return self.fn(res) if self.fn else self.name if not res else res
 
     def apply(self):
         for q in itertools.zip_longest(*self.dependency_tasks()):
-            res = self.post_process(q)
-            # if hasattr(res, "__len__") and len(res) > 0:
-            #     yield from res
-            # else:
-            #     yield res
-            yield res
+            yield self.post_process(q)
 
 
 class MinCostNode(Node):
@@ -217,10 +179,16 @@ def build_adj_matrix(node, node_map, adj_mat = None):
             adj_mat[m,node_map[d.name]] = d.cost()
     return adj_mat
 
+def print_header(str):
+    print()
+    print("="*len(str))
+    print(str)
+    print("="*len(str))
+    print()
+
+
 def test_sync_node():
-    print("-"*20)
-    print("testing sync node graphs:")
-    print("-"*20)
+    print_header("testing sync node graphs:")
 
     aNode = Node("a", 1)
     sb1Node = Node("sb1", cost = 0)
@@ -246,11 +214,11 @@ def test_sync_node():
 
     [print(d.name) for d in root]
 
-    print("running graph:")
+    print_header("running graph:")
 
-    root.apply()
+    print(root.apply())
 
-    print("running min graph")
+    print_header("running min graph")
 
     sb1Node = Node("sb1", cost = 0)
     sb2bNode = Node("sb2", cost = 2)
@@ -264,18 +232,16 @@ def test_sync_node():
     bNode = Node("b", cost = 2, dependencies = [sb2Node])
     root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
-    print("running with cache node: pass 1")
+    print_header("running with cache node: pass 1")
     print("total cost: {}".format(root.cost()))
     root.apply()
-    print("running with cache node: pass 2")
+    print_header("running with cache node: pass 2")
     print("total cost: {}".format(root.cost()))
     root.apply()
 
 
 def test_async_node():
-    print("-"*20)
-    print("testing async node graphs:")
-    print("-"*20)
+    print_header("testing async node graphs:")
 
     aNode = AsyncNode("a", 1)
     sb1Node = AsyncNode("sb1", cost = 0)
@@ -298,7 +264,7 @@ def test_async_node():
 
     [print(d.name) for d in root]
 
-    print("running graph:")
+    print_header("running graph:")
 
     # async def foo(node):
     #     await node.apply()
@@ -307,9 +273,9 @@ def test_async_node():
     async def run_graph(root):
         await root.apply()
 
-    asyncio.run(run_graph(root))
+    print(asyncio.run(run_graph(root)))
 
-    print("running min graph")
+    print_header("running min graph")
 
     sb1Node = AsyncNode("sb1", cost = 0)
     sb2bNode = AsyncNode("sb2", cost = 2)
@@ -323,17 +289,15 @@ def test_async_node():
     bNode = AsyncNode("b", cost = 2, dependencies = [sb2Node])
     root = AsyncNode("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
-    print("running with cache node: pass 1")
+    print_header("running with cache node: pass 1")
     print("total cost: {}".format(root.cost()))
     asyncio.run(run_graph(root))
-    print("running with cache node: pass 2")
+    print_header("running with cache node: pass 2")
     print("total cost: {}".format(root.cost()))
     asyncio.run(run_graph(root))
 
 def test_stream_node():
-    print("-"*20)
-    print("testing async node graphs:")
-    print("-"*20)
+    print_header("testing async node graphs:")
 
     class RangeNode(StreamNode):
         def __init__(self, name, b, e, cost = 0):
@@ -347,18 +311,14 @@ def test_stream_node():
 
     class SumNode(StreamNode):
         def __init__(self, name, dependencies, cost = 0):
-            super().__init__(name, dependencies = dependencies, cost = cost)   
+            super().__init__(name, dependencies = dependencies, cost = cost, fn = lambda r: sum([x or 0 for x in r]))   
 
-        def post_process(self, r):
-            val = sum([x or 0 for x in r])
-            print("adding: {} = {}".format(r, val))
-            return val
 
     root = RangeNode("a", 1, 10, cost = 1)
-    print("running range graph:")
+    print_header("running range graph:")
     [print(x) for x in root]
 
-    print("running sum graph:")
+    print_header("running sum graph:")
 
     aNode = RangeNode("a", 1, 10, cost = 1)
     bNode = RangeNode("b", 20, 30, cost = 1)
@@ -368,7 +328,7 @@ def test_stream_node():
 
     [print(x) for x in root]
 
-    print("running double sum chains")
+    print_header("running double sum chains")
 
     aNode = RangeNode("a", 0, 10, cost = 1)
     bNode = RangeNode("b", 20, 30, cost = 1)
@@ -383,7 +343,7 @@ def test_stream_node():
 
     [print(x) for x in root]
 
-    print("running tuple chains")
+    print_header("running tuple chains")
 
     aNode = RangeNode("a", 0, 10, cost = 1)
     bNode = RangeNode("b", 20, 30, cost = 1)
@@ -397,7 +357,7 @@ def test_stream_node():
 
     [print(x) for x in root]
 
-    print("running timer node")
+    print_header("running timer node")
 
     class TimerNode(StreamNode):
         def __init__(self, name, count, duration, cost = 0):
@@ -407,7 +367,7 @@ def test_stream_node():
 
         def apply(self):
             for i in range(self.count):
-                time.sleep(self.duration)
+                time.sleep(self.duration / 10)
                 yield i
 
     aNode = TimerNode("a", 10, 1, cost = 1)
@@ -415,8 +375,19 @@ def test_stream_node():
     root = SumNode("c", [aNode, bNode], cost = 3)
     [print(x) for x in root]
 
+    print_header("timer trigger node")
+
+    def subgraph():
+        a = Node("a", fn = lambda r: 1)
+        b = Node("b", fn = lambda r: 2)
+        c = Node("c", dependencies=[a,b], fn = lambda r: sum(r))
+        return c
+
+    aNode = TimerNode("s_a", 10, 1, cost = 1)
+    root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: subgraph().apply())
+    [print(x) for x in root]
 
 
-#test_sync_node()
-#test_async_node()
+test_sync_node()
+test_async_node()
 test_stream_node()
