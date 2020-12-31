@@ -18,6 +18,8 @@ class TraceNode(Node):
         pp_res = super().post_process(res)
         return pp_res if pp_res else self.name
 
+# if not self.fn:
+#     await asyncio.sleep(self.process_cost() / 10)
 class SlowNode(Node):
 
     def __init__(self, node):
@@ -30,6 +32,9 @@ class SlowNode(Node):
         time.sleep(self.process_cost() / 10)
         return super().post_process(res)
 
+
+async def run_graph(root):
+    return await root.apply()
 
 def print_nodes(node, indent = "", siblingCount = 0):
     if siblingCount > 1:
@@ -142,9 +147,6 @@ def test_async_node():
 
     print_header("running graph:")
 
-    async def run_graph(root):
-        await root.apply()
-
     print(asyncio.run(run_graph(root)))
 
     print_header("running min graph")
@@ -247,7 +249,7 @@ def test_stream_node():
     root = SumNode("c", [aNode, bNode], cost = 3)
     [print(x) for x in root]
 
-    print_header("timer trigger node")
+    print_header("timer trigger sync subgraph")
 
     def subgraph():
         a = Node("a", fn = lambda r: 1)
@@ -258,4 +260,24 @@ def test_stream_node():
     aNode = TimerNode("s_a", 10, 1, cost = 1)
     root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: subgraph().apply())
     [print(x) for x in root]
+
+    print_header("timer trigger async subgraph")
+
+    async def async_val(a):
+        return a
+
+    async def async_fn(a, fn):
+        return fn(a)
+
+    def subgraph():
+        a = AsyncNode("a", fn = lambda r: async_val(1))
+        b = AsyncNode("b", fn = lambda r: async_val(2))
+        c = AsyncNode("c", dependencies=[a,b], fn = lambda r: async_fn(r, lambda x: sum(x)))
+        return c
+
+    print("subgraph: {}".format(asyncio.run(run_graph(subgraph()))))
+
+    aNode = TimerNode("s_a", 10, 1, cost = 1)
+    root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: asyncio.run(run_graph(subgraph())))
+    [print("stream: {}".format(x)) for x in root]
 

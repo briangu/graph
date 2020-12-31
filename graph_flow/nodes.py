@@ -58,10 +58,7 @@ class AsyncNode(Node):
         yield await self.apply()
 
     async def post_process(self, res):
-        print("post process: {} {}".format(self.name, res))
-        # if not self.fn:
-        #     await asyncio.sleep(self.process_cost() / 10)
-        return await self.fn(res) if self.fn else self.name if not res else res
+        return await self.fn(res) if self.fn else res
 
     async def apply(self):
         tasks = self.dependency_tasks() 
@@ -77,12 +74,25 @@ class StreamNode(Node):
         yield from self.apply()
 
     def post_process(self, res):
-        # print("post process: {} {}".format(self.name, res))
-        return self.fn(res) if self.fn else self.name if not res else res
+        return self.fn(res) if self.fn else res
 
     def apply(self):
         for q in itertools.zip_longest(*self.dependency_tasks()):
             yield self.post_process(q)
+
+# class StreamAsyncNode(AsyncNode):
+#     def __init__(self, name, cost = 0, dependencies = [], fn = None):
+#         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
+
+#     async def __iter__(self):
+#         yield from await self.apply()
+
+#     async def post_process(self, res):
+#         return await self.fn(res) if self.fn else res
+
+#     async def apply(self):
+#         for q in itertools.zip_longest(*self.dependency_tasks()):
+#             yield await self.post_process(q)
 
 
 class MinCostNode(Node):
