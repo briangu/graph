@@ -50,6 +50,19 @@ class Node():
     def apply(self):
         return self.post_process(self.dependency_tasks())
 
+class TraceNode(Node):
+
+    def __init__(self, node):
+        name = "t_{}".format(node.name)
+        deps = [TraceNode(d) for d in node.dependencies]
+        super().__init__(name, cost = node.cost, dependencies=deps, fn = node.fn)
+        self.node = node
+
+    def post_process(self, res):
+        print("post process: {} {}".format(self.name, res))
+        pp_res = super().post_process(res)
+        return pp_res if pp_res else self.name
+
 class AsyncNode(Node):
     def __init__(self, name, cost = 0, dependencies = [], fn = None):
         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
