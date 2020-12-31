@@ -26,7 +26,7 @@ class Node():
         self.fn = fn
 
     def __iter__(self):
-        return self.traverse()
+        yield self.apply()
 
     def traverse(self):
         def recursive_iter(node):
@@ -61,6 +61,9 @@ class Node():
 class AsyncNode(Node):
     def __init__(self, name, cost = 0, dependencies = [], fn = None):
         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
+
+    async def __iter__(self):
+        yield await self.apply()
 
     async def post_process(self, res):
         print("post process: {} {}".format(self.name, res))

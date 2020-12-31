@@ -4,25 +4,25 @@ import numpy as np
 import time
 from graph_flow.nodes import *
 
-def print_nodes(n, indent = "", siblingCount = 0):
+def print_nodes(node, indent = "", siblingCount = 0):
     if siblingCount > 1:
         child_indent = indent + "|"
     else:
         child_indent = indent + " "
-    print("{}{} [{}:{}+{}]".format(indent, n.name, n.cost(), n.process_cost(), n.dependencies_cost()))
-    [print_nodes(d, child_indent, len(n.dependencies)) for d in n.dependencies]
+    print("{}{} [{}:{}+{}]".format(indent, node.name, node.cost(), node.process_cost(), node.dependencies_cost()))
+    [print_nodes(d, child_indent, len(node.dependencies)) for d in node.dependencies]
 
 def count_nodes(node):
-    return len(node)
+    return len(node.traverse())
 
 def map_nodes(node):
-    return {n.name: i for i, n in enumerate(node)}
+    return {n.name: i for i, n in enumerate(node.traverse())}
 
 def build_adj_matrix(node, node_map, adj_mat = None):
     if adj_mat is None:
         n = len(node_map.keys())
         adj_mat = np.zeros((n, n))
-    for n in node:
+    for n in node.traverse():
         m = node_map[n.name]
         for d in n.dependencies:
             adj_mat[m,node_map[d.name]] = d.cost()
@@ -61,7 +61,7 @@ def test_sync_node():
 
     print("total cost: {}".format(root.cost()))
 
-    [print(d.name) for d in root]
+    [print(d.name) for d in root.traverse()]
 
     print_header("running graph:")
 
@@ -111,7 +111,7 @@ def test_async_node():
 
     adj_matrix = build_adj_matrix(root, node_map)
 
-    [print(d.name) for d in root]
+    [print(d.name) for d in root.traverse()]
 
     print_header("running graph:")
 
@@ -232,7 +232,3 @@ def test_stream_node():
     root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: subgraph().apply())
     [print(x) for x in root]
 
-
-test_sync_node()
-test_async_node()
-test_stream_node()
