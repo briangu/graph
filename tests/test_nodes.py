@@ -4,6 +4,33 @@ import numpy as np
 import time
 from graph_flow.nodes import *
 
+
+class TraceNode(Node):
+
+    def __init__(self, node):
+        name = "t_{}".format(node.name)
+        deps = [TraceNode(d) for d in node.dependencies]
+        super().__init__(name, cost = node.cost, dependencies=deps, fn = node.fn)
+        self.node = node
+
+    def post_process(self, res):
+        print("post process: {} {}".format(self.name, res))
+        pp_res = super().post_process(res)
+        return pp_res if pp_res else self.name
+
+class SlowNode(Node):
+
+    def __init__(self, node):
+        name = "s_{}".format(node.name)
+        deps = [SlowNode(d) for d in node.dependencies]
+        super().__init__(name, cost = node.cost, dependencies=deps, fn = node.fn)
+        self.node = node
+
+    def post_process(self, res):
+        time.sleep(self.process_cost() / 10)
+        return super().post_process(res)
+
+
 def print_nodes(node, indent = "", siblingCount = 0):
     if siblingCount > 1:
         child_indent = indent + "|"

@@ -10,9 +10,6 @@ import time
 
 # identifying reused nodes and topologically sorting according to base nodes -or failing
 
-# debug injection walker
-# sleep injection walker
-
 # 3 kinds of nodes
 # synchronous
 # async
@@ -48,15 +45,10 @@ class Node():
         return self.process_cost() + self.dependencies_cost()
 
     def post_process(self, res):
-        print("post process: {} {}".format(self.name, res))
-        # if not self.fn:
-        #     time.sleep(self.process_cost() / 10)
-        return self.fn(res) if self.fn else self.name if not res else res
+        return self.fn(res) if self.fn else res
 
     def apply(self):
-        task_results = self.dependency_tasks() 
-        return self.post_process(task_results)
-
+        return self.post_process(self.dependency_tasks())
 
 class AsyncNode(Node):
     def __init__(self, name, cost = 0, dependencies = [], fn = None):
