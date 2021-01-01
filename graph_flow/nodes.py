@@ -1,3 +1,4 @@
+import aiostream
 import asyncio
 import itertools
 import numpy as np
@@ -50,18 +51,17 @@ class Node():
     def apply(self):
         return self.post_process(self.dependency_tasks())
 
-class TraceNode(Node):
+    async def __aiter__(self):
+        yield await self.aapply()
 
-    def __init__(self, node):
-        name = "t_{}".format(node.name)
-        deps = [TraceNode(d) for d in node.dependencies]
-        super().__init__(name, cost = node.cost, dependencies=deps, fn = node.fn)
-        self.node = node
+    async def apost_process(self, res):
+        return await self.fn(res) if self.fn else res
 
-    def post_process(self, res):
-        print("post process: {} {}".format(self.name, res))
-        pp_res = super().post_process(res)
-        return pp_res if pp_res else self.name
+    # can this be the same as stream node aapply()?
+    async def aapply(self):
+        tasks = [d.aapply() for d in self.dependencies]
+        res = await asyncio.gather(*tasks)
+        return await self.apost_process(res)
 
 class AsyncNode(Node):
     def __init__(self, name, cost = 0, dependencies = [], fn = None):
@@ -93,35 +93,31 @@ class StreamNode(Node):
         for q in itertools.zip_longest(*self.dependency_tasks()):
             yield self.post_process(q)
 
-class StreamAsyncNode(Node):
-    def __init__(self, name, cost = 0, dependencies = [], fn = None):
-        super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
-
     async def __aiter__(self):
-        async for x in self.apply():
+        async for x in self.aapply():
             yield x
 
-    async def post_process(self, res):
+    async def apost_process(self, res):
         return self.fn(res) if self.fn else res
 
-    async def apply(self):
-        async for q in itertools.zip_longest(*self.dependency_tasks()):
-            yield await self.post_process(q)
+    async def aapply(self):
+        dep_futures = [d.aapply() for d in self.dependencies]
+        async for q in aiostream.stream.ziplatest(*dep_futures):
+            yield await self.apost_process(q)
 
-# class StreamAsyncNode(AsyncNode):
-#     def __init__(self, name, cost = 0, dependencies = [], fn = None):
-#         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
 
-#     async def __iter__(self):
-#         yield from await self.apply()
+class TraceNode(Node):
 
-#     async def post_process(self, res):
-#         return await self.fn(res) if self.fn else res
+    def __init__(self, node):
+        name = "t_{}".format(node.name)
+        deps = [TraceNode(d) for d in node.dependencies]
+        super().__init__(name, cost = node.cost, dependencies=deps, fn = node.fn)
+        self.node = node
 
-#     async def apply(self):
-#         for q in itertools.zip_longest(*self.dependency_tasks()):
-#             yield await self.post_process(q)
-
+    def post_process(self, res):
+        print("post process: {} {}".format(self.name, res))
+        pp_res = super().post_process(res)
+        return pp_res if pp_res else self.name
 
 class MinCostNode(Node):
     def min_dependency(self):
@@ -130,12 +126,12 @@ class MinCostNode(Node):
         return min((n.cost(), i) for (i, n) in enumerate(self.dependencies))
 
     def dependency_tasks(self):
-        v, i = self.min_dependency()
+        _, i = self.min_dependency()
         min_dep = self.dependencies[i]
         return [min_dep.apply()]
 
     def dependencies_cost(self):
-        v, i = self.min_dependency()
+        v, _ = self.min_dependency()
         return v
 
 class MinCostAsyncNode(MinCostNode, AsyncNode):
