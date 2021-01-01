@@ -93,6 +93,21 @@ class StreamNode(Node):
         for q in itertools.zip_longest(*self.dependency_tasks()):
             yield self.post_process(q)
 
+class StreamAsyncNode(Node):
+    def __init__(self, name, cost = 0, dependencies = [], fn = None):
+        super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
+
+    async def __aiter__(self):
+        async for x in self.apply():
+            yield x
+
+    async def post_process(self, res):
+        return self.fn(res) if self.fn else res
+
+    async def apply(self):
+        async for q in itertools.zip_longest(*self.dependency_tasks()):
+            yield await self.post_process(q)
+
 # class StreamAsyncNode(AsyncNode):
 #     def __init__(self, name, cost = 0, dependencies = [], fn = None):
 #         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
