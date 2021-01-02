@@ -34,7 +34,7 @@ class SlowNode(Node):
 
 
 async def run_graph(root):
-    return await root.apply()
+    return await root.aapply()
 
 def print_nodes(node, indent = "", siblingCount = 0):
     if siblingCount > 1:
@@ -124,15 +124,15 @@ def test_sync_node():
 def test_async_node():
     print_header("testing async node graphs:")
 
-    aNode = AsyncNode("a", 1)
-    sb1Node = AsyncNode("sb1", cost = 0)
-    sb2bNode = AsyncNode("sb2", cost = 2)
-    bNode = AsyncNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-    cNode = AsyncNode("c", cost = 4, dependencies = [aNode])
-    dNode = AsyncNode("d", cost = 3)
-    eNode = AsyncNode("e", cost = 1, dependencies = [cNode, dNode])
-    fNode = AsyncNode("f", cost = 5)
-    root = AsyncNode("h", cost = 1, dependencies = [eNode, fNode, bNode])
+    aNode = Node("a", 1)
+    sb1Node = Node("sb1", cost = 0)
+    sb2bNode = Node("sb2", cost = 2)
+    bNode = Node("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+    cNode = Node("c", cost = 4, dependencies = [aNode])
+    dNode = Node("d", cost = 3)
+    eNode = Node("e", cost = 1, dependencies = [cNode, dNode])
+    fNode = Node("f", cost = 5)
+    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
     node_map = map_nodes(root)
     n = len(node_map.keys())
@@ -142,6 +142,7 @@ def test_async_node():
     print_nodes(root)
 
     adj_matrix = build_adj_matrix(root, node_map)
+    print(adj_matrix)
 
     [print(d.name) for d in root.traverse()]
 
@@ -151,17 +152,17 @@ def test_async_node():
 
     print_header("running min graph")
 
-    sb1Node = AsyncNode("sb1", cost = 0)
-    sb2bNode = AsyncNode("sb2", cost = 2)
-    bNode = MinCostAsyncNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-    root = AsyncNode("h", cost = 1, dependencies = [eNode, fNode, bNode])
+    sb1Node = Node("sb1", cost = 0)
+    sb2bNode = Node("sb2", cost = 2)
+    bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
+    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
     asyncio.run(run_graph(root))
 
-    sb1Node = AsyncNode("sb1", cost = 10)
-    sb2Node = CacheAsyncNode("sb2-cache", sb1Node, cost = 0)
-    bNode = AsyncNode("b", cost = 2, dependencies = [sb2Node])
-    root = AsyncNode("h", cost = 1, dependencies = [eNode, fNode, bNode])
+    sb1Node = Node("sb1", cost = 10)
+    sb2Node = CacheNode("sb2-cache", sb1Node, cost = 0)
+    bNode = Node("b", cost = 2, dependencies = [sb2Node])
+    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
     print_header("running with cache node: pass 1")
     print("total cost: {}".format(root.cost()))
@@ -269,15 +270,15 @@ def test_stream_node():
     async def async_fn(a, fn):
         return fn(a)
 
-    def subgraph():
-        a = AsyncNode("a", fn = lambda r: async_val(1))
-        b = AsyncNode("b", fn = lambda r: async_val(2))
-        c = AsyncNode("c", dependencies=[a,b], fn = lambda r: async_fn(r, lambda x: sum(x)))
+    def asubgraph():
+        a = Node("a", fn = lambda r: async_val(1))
+        b = Node("b", fn = lambda r: async_val(2))
+        c = Node("c", dependencies=[a,b], fn = lambda r: async_fn(r, lambda x: sum(x)))
         return c
 
-    print("subgraph: {}".format(asyncio.run(run_graph(subgraph()))))
+    print("subgraph: {}".format(asyncio.run(run_graph(asubgraph()))))
 
     aNode = TimerNode("s_a", 10, 1, cost = 1)
-    root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: asyncio.run(run_graph(subgraph())))
+    root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: asyncio.run(run_graph(asubgraph())))
     [print("stream: {}".format(x)) for x in root]
 

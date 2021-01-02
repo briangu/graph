@@ -63,22 +63,6 @@ class Node():
         res = await asyncio.gather(*tasks)
         return await self.apost_process(res)
 
-class AsyncNode(Node):
-    def __init__(self, name, cost = 0, dependencies = [], fn = None):
-        super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
-
-    async def __iter__(self):
-        yield await self.apply()
-
-    async def post_process(self, res):
-        return await self.fn(res) if self.fn else res
-
-    async def apply(self):
-        tasks = self.dependency_tasks() 
-        res = await asyncio.gather(*tasks)
-        return await self.post_process(res)
-
-
 class StreamNode(Node):
     def __init__(self, name, cost = 0, dependencies = [], fn = None):
         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
@@ -105,10 +89,7 @@ class StreamNode(Node):
         async for q in aiostream.stream.ziplatest(*dep_futures):
             res = (await self.apost_process(q))[0]
             if not res is None:
-                # print("have value: {} {}".format(self.name, res))
                 yield res
-            # else:
-            #     print("skipping: {} {}".format(self.name, res))
 
 class TraceNode(Node):
 
@@ -138,9 +119,6 @@ class MinCostNode(Node):
         v, _ = self.min_dependency()
         return v
 
-class MinCostAsyncNode(MinCostNode, AsyncNode):
-    pass
-
 class CacheNode(Node):
 
     internal_cache = None
@@ -164,26 +142,16 @@ class CacheNode(Node):
     def apply(self):
         return self.get_cache() if self.internal_cache else self.set_cache(super().apply())
 
-class CacheAsyncNode(AsyncNode):
-
-    internal_cache = None
-
-    def __init__(self, name, dependency, cost = 0):
-        super().__init__(name, dependencies=[dependency], cost = cost)   
-
-    def cost(self):
-        return self.process_cost() + self.dependencies_cost() if not self.internal_cache else 0
-
-    async def set_cache(self, val):
+    async def aset_cache(self, val):
         print("set cache: {} {}".format(self.name, val))
         self.internal_cache = val
         return val
 
-    async def get_cache(self):
+    async def aget_cache(self):
         val = self.internal_cache
         print("get cache: {} {}".format(self.name, val))
         return val
 
-    async def apply(self):
-        return await self.get_cache() if self.internal_cache else await self.set_cache(await super().apply())
+    async def aapply(self):
+        return await self.aget_cache() if self.internal_cache else await self.aset_cache(await super().aapply())
 
