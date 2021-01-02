@@ -104,11 +104,11 @@ class StreamNode(Node):
         dep_futures = [d.aapply() for d in self.dependencies]
         async for q in aiostream.stream.ziplatest(*dep_futures):
             res = (await self.apost_process(q))[0]
-            if res:
+            if not res is None:
                 # print("have value: {} {}".format(self.name, res))
                 yield res
             # else:
-                # print("skipping: {} {}".format(self.name, res))
+            #     print("skipping: {} {}".format(self.name, res))
 
 class TraceNode(Node):
 
