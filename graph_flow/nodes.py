@@ -98,13 +98,17 @@ class StreamNode(Node):
             yield x
 
     async def apost_process(self, res):
-        return self.fn(res) if self.fn else res
+        return self.fn(res) if self.fn else True, res
 
     async def aapply(self):
         dep_futures = [d.aapply() for d in self.dependencies]
         async for q in aiostream.stream.ziplatest(*dep_futures):
-            yield await self.apost_process(q)
-
+            res = (await self.apost_process(q))[0]
+            if res:
+                # print("have value: {} {}".format(self.name, res))
+                yield res
+            # else:
+                # print("skipping: {} {}".format(self.name, res))
 
 class TraceNode(Node):
 
