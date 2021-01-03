@@ -57,7 +57,7 @@ class Node():
     async def apost_process(self, res):
         return await self.fn(res) if self.fn else res
 
-    # can this be the same as stream node aapply()?
+    # TODO similar to aaply in stream, use queue
     async def aapply(self):
         tasks = [d.aapply() for d in self.dependencies]
         res = await asyncio.gather(*tasks)
@@ -84,30 +84,35 @@ class StreamNode(Node):
         async for x in self.aapply():
             yield x
 
+    #TODO: package results with node name dictionary
     async def apost_process(self, res):
-        return self.fn(res) if self.fn else True, res
+        def unwrap(x, l=None):
+#            print("post_process: {} {} {} {}".format(self.name, type(x), len(x) if hasattr(x, '__len__') else 0, x))
+            if type(x) is tuple: # and len(x) == 1:
+                return unwrap(x[0], x)
+            return l
+        _res = unwrap(res) if len(self.dependencies) == 1 else res
+        # print("post_process: {} {} {} {}".format(self.name, type(_res), _res, res))
+
+        return self.fn(_res) if self.fn else _res
 
     async def aapply(self):
         if self.queues is None:
-            print("{}: first pass".format(self.name))
             self.queues = []
             dep_futures = [d.aapply() for d in self.dependencies]
-            async for q in stream.ziplatest(*dep_futures):
-                res = (await self.apost_process(q))[0]
+            async for fr in stream.ziplatest(*dep_futures):
+                res = await self.apost_process(fr)
                 if not res is None:
                     if self.queues:
                         for q in self.queues:
                             q.put_nowait(res)
                     yield res
         else:
-            print("{}: adding to queue".format(self.name))
             q = asyncio.Queue()
             self.queues.append(q)
             xs = stream.call(q.get)
             ys = stream.cycle(xs)
-            # zs = stream.flatten(ys, task_limit=None)
-            zs = ys
-            async with zs.stream() as streamer:
+            async with ys.stream() as streamer:
                 async for item in streamer:
                     yield item
 
