@@ -1,4 +1,4 @@
-import aiostream
+from aiostream import stream
 import asyncio
 import itertools
 import numpy as np
@@ -64,6 +64,9 @@ class Node():
         return await self.apost_process(res)
 
 class StreamNode(Node):
+
+    queues = None
+
     def __init__(self, name, cost = 0, dependencies = [], fn = None):
         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
 
@@ -85,11 +88,29 @@ class StreamNode(Node):
         return self.fn(res) if self.fn else True, res
 
     async def aapply(self):
-        dep_futures = [d.aapply() for d in self.dependencies]
-        async for q in aiostream.stream.ziplatest(*dep_futures):
-            res = (await self.apost_process(q))[0]
-            if not res is None:
-                yield res
+        if self.queues is None:
+            print("{}: first pass".format(self.name))
+            self.queues = []
+            dep_futures = [d.aapply() for d in self.dependencies]
+            async for q in stream.ziplatest(*dep_futures):
+                res = (await self.apost_process(q))[0]
+                if not res is None:
+                    if self.queues:
+                        for q in self.queues:
+                            q.put_nowait(res)
+                    yield res
+        else:
+            print("{}: adding to queue".format(self.name))
+            q = asyncio.Queue()
+            self.queues.append(q)
+            xs = stream.call(q.get)
+            ys = stream.cycle(xs)
+            # zs = stream.flatten(ys, task_limit=None)
+            zs = ys
+            async with zs.stream() as streamer:
+                async for item in streamer:
+                    yield item
+
 
 class TraceNode(Node):
 
