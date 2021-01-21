@@ -36,14 +36,6 @@ class SlowNode(Node):
 async def run_graph(root):
     return await root.aapply()
 
-def print_nodes(node, indent = "", siblingCount = 0):
-    if siblingCount > 1:
-        child_indent = indent + "|"
-    else:
-        child_indent = indent + " "
-    print("{}{} [{}:{}+{}]".format(indent, node.name, node.cost(), node.process_cost(), node.dependencies_cost()))
-    [print_nodes(d, child_indent, len(node.dependencies)) for d in node.dependencies]
-
 def count_nodes(node):
     return len(node.traverse())
 
@@ -282,3 +274,26 @@ def test_stream_node():
     root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: asyncio.run(run_graph(asubgraph())))
     [print("stream: {}".format(x)) for x in root]
 
+
+def test_processing_stream_nodes():
+
+    class TimerProcessingNode(StreamNode):
+        def __init__(self, name, count, duration, cost = 0):
+            super().__init__(name, cost = cost)   
+            self.count = count
+            self.duration = duration
+
+        def apply(self):
+            for i in range(self.count):
+                time.sleep(self.duration / 10)
+                yield i
+
+
+    aNode = TimerProcessingNode("aNode")
+    bNode = ProcessingStreamNode("bNode", dependencies=[aNode], fn = print)
+
+    tasks = [asyncio.ensure_future(b.run()) for b in bNode.traverse()]
+
+    asyncio.run(tasks)
+
+    

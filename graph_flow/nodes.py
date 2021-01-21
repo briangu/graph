@@ -3,6 +3,7 @@ import asyncio
 import itertools
 import numpy as np
 import time
+import aioprocessing
 
 #todo:
 # add either a generic way to pass types in or dict or just use typed sub-classes
@@ -63,9 +64,15 @@ class Node():
         res = await asyncio.gather(*tasks)
         return await self.apost_process(res)
 
+    async def start(self):
+        pass
+
+    async def join(self):
+        pass
+
 class StreamNode(Node):
 
-    queues = None
+    subscribers = None
 
     def __init__(self, name, cost = 0, dependencies = [], fn = None):
         super().__init__(name, cost=cost, dependencies=dependencies, fn=fn)
@@ -97,25 +104,71 @@ class StreamNode(Node):
         return self.fn(_res) if self.fn else _res
 
     async def aapply(self):
-        if self.queues is None:
-            self.queues = []
+        if self.subscribers is None:
+            self.subscribers = []
             dep_futures = [d.aapply() for d in self.dependencies]
             async for fr in stream.ziplatest(*dep_futures):
                 res = await self.apost_process(fr)
                 if not res is None:
-                    if self.queues:
-                        for q in self.queues:
+                    if self.subscribers:
+                        for q in self.subscribers:
                             q.put_nowait(res)
                     yield res
         else:
             q = asyncio.Queue()
-            self.queues.append(q)
+            self.subscribers.append(q)
             xs = stream.call(q.get)
             ys = stream.cycle(xs)
             async with ys.stream() as streamer:
                 async for item in streamer:
                     yield item
 
+
+class ProcessingStreamNode(StreamNode):
+
+    p = None
+    subscriber_queues = None
+
+    async def aprocess(self):
+        # dep_futures = [d.aapply() for d in self.dependencies]
+        async for fr in stream.ziplatest(*self.dep_futures):
+            yield await self.apost_process(fr)
+
+    async def __broadcast__(self):
+        async for res in self.aprocess():
+            if not res is None:
+                print(self.name)
+                for q in self.subscriber_queues:
+                    await q.coro_put(res)                
+
+    # TODO: we can also check the sq each iteration before broadcast
+    def __process__(self):
+        asyncio.run(self.__broadcast__())
+
+    # TODO: we can start while building the graph
+    async def aapply(self):
+        if self.subscriber_queues is None:
+            self.dep_futures = [d.aapply() for d in self.dependencies]
+            self.subscriber_queues = []
+        print("aapply: {} subscribers: {}".format(self.name, len(self.subscriber_queues)))
+        q = aioprocessing.AioQueue()
+        self.subscriber_queues.append(q)
+        xs = stream.call(await q.coro_get())
+        ys = stream.cycle(xs)
+        async with ys.stream() as streamer:
+            async for item in streamer:
+                yield item
+
+    async def start(self):
+        if self.p is None:
+            print("node: {} subscribers: {}".format(self.name, len(self.subscriber_queues)))
+            self.p = aioprocessing.AioProcess(target=self.__process__, args=())
+            self.p.start()
+
+    async def join(self):
+        if self.p:
+            await self.p.coro_join()
+            self.p = None
 
 class TraceNode(Node):
 
