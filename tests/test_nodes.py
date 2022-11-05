@@ -1,22 +1,12 @@
+import unittest
+
 import asyncio
-import itertools
-import numpy as np
 import time
-from graph_flow.nodes import *
 
+from graph_flow.node import *
+from graph_flow.util import print_nodes, MinCostNode, CacheNode
+from graph_flow.stream_nodes import StreamNode, ProcessingStreamNode
 
-class TraceNode(Node):
-
-    def __init__(self, node):
-        name = "t_{}".format(node.name)
-        deps = [TraceNode(d) for d in node.dependencies]
-        super().__init__(name, cost = node.cost, dependencies=deps, fn = node.fn)
-        self.node = node
-
-    def post_process(self, res):
-        print("post process: {} {}".format(self.name, res))
-        pp_res = super().post_process(res)
-        return pp_res if pp_res else self.name
 
 # if not self.fn:
 #     await asyncio.sleep(self.process_cost() / 10)
@@ -25,7 +15,7 @@ class SlowNode(Node):
     def __init__(self, node):
         name = "s_{}".format(node.name)
         deps = [SlowNode(d) for d in node.dependencies]
-        super().__init__(name, cost = node.cost, dependencies=deps, fn = node.fn)
+        super().__init__(*deps, name = name, cost = node.cost, fn = node.fn)
         self.node = node
 
     def post_process(self, res):
@@ -45,11 +35,11 @@ def map_nodes(node):
 def build_adj_matrix(node, node_map, adj_mat = None):
     if adj_mat is None:
         n = len(node_map.keys())
-        adj_mat = np.zeros((n, n))
+        adj_mat = [[0]*n for _ in range(n+1)]
     for n in node.traverse():
         m = node_map[n.name]
         for d in n.dependencies:
-            adj_mat[m,node_map[d.name]] = d.cost()
+            adj_mat[m][node_map[d.name]] = d.cost()
     return adj_mat
 
 def print_header(str):
@@ -60,72 +50,105 @@ def print_header(str):
     print()
 
 
-def test_sync_node():
-    print_header("testing sync node graphs:")
+def get_test_graph():
+    aNode = Node(1, name="a")
+    sb1Node = Node(name="sb1", cost = 0)
+    sb2bNode = Node(name = "sb2", cost = 2)
+    bNode = Node(sb1Node, sb2bNode, name="b", cost = 2)
+    cNode = Node(aNode, name="c", cost = 4)
+    dNode = Node(cost = 3, name="d")
+    eNode = Node(cNode, dNode, name="e", cost = 1)
+    fNode = Node(name="f", cost = 5)
+    root = Node(eNode, fNode, bNode, name="h", cost = 1)
+    return root
 
-    aNode = Node("a", 1)
-    sb1Node = Node("sb1", cost = 0)
-    sb2bNode = Node("sb2", cost = 2)
-    bNode = Node("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-    cNode = Node("c", cost = 4, dependencies = [aNode])
-    dNode = Node("d", cost = 3)
-    eNode = Node("e", cost = 1, dependencies = [cNode, dNode])
-    fNode = Node("f", cost = 5)
-    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
 
-    node_map = map_nodes(root)
-    n = len(node_map.keys())
+def get_min_cost_graph():
+    aNode = Node(name="a", fn=lambda _: 1)
+    sb1Node = Node(name="sb1", cost = 0)
+    sb2bNode = Node(name = "sb2", cost = 2)
+    bNode = Node(sb1Node, sb2bNode, name="b", cost = 2)
+    cNode = Node(aNode, name="c", cost = 4)
+    dNode = Node(cost = 3, name="d")
+    eNode = Node(cNode, dNode, name="e", cost = 1)
+    fNode = Node(name="f", cost = 5)
+    sb1Node = Node(name="sb1", cost = 0)
+    sb2bNode = Node(name="sb2", cost = 2)
+    bNode = MinCostNode(sb1Node, sb2bNode, name="b", cost = 2)
+    root = Node(eNode, fNode, bNode, name="h", cost = 1)
+    return root
 
-    print("node count: {}".format(n))
-    print(node_map)
-    print_nodes(root)
 
-    adj_matrix = build_adj_matrix(root, node_map)
-    print(adj_matrix)
+def get_cache_node_graph():
+    aNode = Node(name="a", fn=lambda _: 1)
+    sb1Node = Node(name="sb1", cost = 0)
+    sb2bNode = Node(name = "sb2", cost = 2)
+    bNode = Node(sb1Node, sb2bNode, name="b", cost = 2)
+    cNode = Node(aNode, name="c", cost = 4)
+    dNode = Node(cost = 3, name="d")
+    eNode = Node(cNode, dNode, name="e", cost = 1)
+    fNode = Node(name="f", cost = 5)
+    sb1Node = Node(name="sb1", cost = 10)
+    sb2Node = CacheNode(sb1Node, name="sb2-cache", cost = 0)
+    bNode = Node(sb2Node, name="b", cost = 2)
+    root = Node(eNode, fNode, bNode, name="h", cost = 1)
+    return root
 
-    print("total cost: {}".format(root.cost()))
 
-    [print(d.name) for d in root.traverse()]
+class TestSyncNode(unittest.TestCase):
+    def test_simple_node(self):
+        a = Node(1, name="a")
+        self.assertEqual(a.name, "a")
+        b = Node(name="b", fn=lambda _: 1)
+        self.assertEqual(b.name, "b")
+        c = Node(a, name="c")
+        self.assertEqual(c.name, "c")
+        self.assertEqual(a.apply(), b.apply())
+        self.assertEqual(a.apply(), c.apply())
 
-    print_header("running graph:")
 
-    print(root.apply())
+    def test_sync_node(self):
+        print_header("testing sync node graphs:")
 
-    print_header("running min graph")
+        root = get_test_graph()
+        node_map = map_nodes(root)
+        n = len(node_map.keys())
 
-    sb1Node = Node("sb1", cost = 0)
-    sb2bNode = Node("sb2", cost = 2)
-    bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
+        print("node count: {}".format(n))
+        print(node_map)
+        print_nodes(root)
 
-    root.apply()
+        adj_matrix = build_adj_matrix(root, node_map)
+        print(adj_matrix)
 
-    sb1Node = Node("sb1", cost = 10)
-    sb2Node = CacheNode("sb2-cache", sb1Node, cost = 0)
-    bNode = Node("b", cost = 2, dependencies = [sb2Node])
-    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
+        print("total cost: {}".format(root.cost()))
 
-    print_header("running with cache node: pass 1")
-    print("total cost: {}".format(root.cost()))
-    root.apply()
-    print_header("running with cache node: pass 2")
-    print("total cost: {}".format(root.cost()))
-    root.apply()
+        [print(d.name) for d in root.traverse()]
+
+        r = root.apply()
+        print(f"result: {r}")
+        self.assertEqual(r, 1)
+
+    def test_min_cost_node(self):
+        print_header("running min graph")
+
+        root = get_min_cost_graph()
+        self.assertEqual(root.apply(), 1)
+
+    def test_cache_node(self):
+        root = get_cache_node_graph()
+        print_header("running with cache node: pass 1")
+        print("total cost: {}".format(root.cost()))
+        root.apply()
+        print_header("running with cache node: pass 2")
+        print("total cost: {}".format(root.cost()))
+        root.apply()
 
 
 def test_async_node():
     print_header("testing async node graphs:")
 
-    aNode = Node("a", 1)
-    sb1Node = Node("sb1", cost = 0)
-    sb2bNode = Node("sb2", cost = 2)
-    bNode = Node("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-    cNode = Node("c", cost = 4, dependencies = [aNode])
-    dNode = Node("d", cost = 3)
-    eNode = Node("e", cost = 1, dependencies = [cNode, dNode])
-    fNode = Node("f", cost = 5)
-    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
-
+    root = get_test_graph()
     node_map = map_nodes(root)
     n = len(node_map.keys())
 
@@ -144,18 +167,10 @@ def test_async_node():
 
     print_header("running min graph")
 
-    sb1Node = Node("sb1", cost = 0)
-    sb2bNode = Node("sb2", cost = 2)
-    bNode = MinCostNode("b", cost = 2, dependencies = [sb1Node, sb2bNode])
-    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
-
+    root = get_min_cost_graph()
     asyncio.run(run_graph(root))
 
-    sb1Node = Node("sb1", cost = 10)
-    sb2Node = CacheNode("sb2-cache", sb1Node, cost = 0)
-    bNode = Node("b", cost = 2, dependencies = [sb2Node])
-    root = Node("h", cost = 1, dependencies = [eNode, fNode, bNode])
-
+    root = get_cache_node_graph()
     print_header("running with cache node: pass 1")
     print("total cost: {}".format(root.cost()))
     asyncio.run(run_graph(root))
@@ -163,12 +178,13 @@ def test_async_node():
     print("total cost: {}".format(root.cost()))
     asyncio.run(run_graph(root))
 
+
 def test_stream_node():
     print_header("testing async node graphs:")
 
     class RangeNode(StreamNode):
         def __init__(self, name, b, e, cost = 0):
-            super().__init__(name, cost = cost)   
+            super().__init__(name=name, cost = cost)
             self.b = b
             self.e = e
 
@@ -177,8 +193,8 @@ def test_stream_node():
                 yield i
 
     class SumNode(StreamNode):
-        def __init__(self, name, dependencies, cost = 0):
-            super().__init__(name, dependencies = dependencies, cost = cost, fn = lambda r: sum([x or 0 for x in r]))   
+        def __init__(self, *dependencies, name=None, cost = 0):
+            super().__init__(*dependencies, name = name, cost = cost, fn = lambda r: sum([x or 0 for x in r]))
 
 
     root = RangeNode("a", 1, 10, cost = 1)
@@ -189,7 +205,7 @@ def test_stream_node():
 
     aNode = RangeNode("a", 1, 10, cost = 1)
     bNode = RangeNode("b", 20, 30, cost = 1)
-    root = SumNode("c", [aNode, bNode], cost = 3)
+    root = SumNode(aNode, bNode, name="c", cost = 3)
 
     print("total cost: {}".format(root.cost()))
 
@@ -199,14 +215,14 @@ def test_stream_node():
 
     aNode = RangeNode("a", 0, 10, cost = 1)
     bNode = RangeNode("b", 20, 30, cost = 1)
-    cNode = SumNode("c", [aNode, bNode], cost = 3)
+    cNode = SumNode(aNode, bNode, name="c", cost = 3)
 
     dNode = RangeNode("d", 100, 110, cost = 1)
     eNode = RangeNode("e", 200, 210, cost = 1)
-    fNode = SumNode("f", [dNode, eNode], cost = 3)
+    fNode = SumNode(dNode, eNode, name="f", cost = 3)
 
-    gNode = SumNode("g", [cNode, fNode], cost = 10)
-    root = StreamNode("h", dependencies=[gNode])
+    gNode = SumNode(cNode, fNode, name="g", cost = 10)
+    root = StreamNode(gNode, name="h")
 
     [print(x) for x in root]
 
@@ -214,13 +230,13 @@ def test_stream_node():
 
     aNode = RangeNode("a", 0, 10, cost = 1)
     bNode = RangeNode("b", 20, 30, cost = 1)
-    cNode = SumNode("c", [aNode, bNode], cost = 3)
+    cNode = SumNode(aNode, bNode, name="c", cost = 3)
 
     dNode = RangeNode("d", 100, 110, cost = 1)
     eNode = RangeNode("e", 200, 210, cost = 1)
-    fNode = SumNode("f", [dNode, eNode], cost = 3)
+    fNode = SumNode(dNode, eNode, name="f", cost = 3)
 
-    root = StreamNode("g", dependencies=[cNode, fNode])
+    root = StreamNode(cNode, fNode, name="g")
 
     [print(x) for x in root]
 
@@ -228,7 +244,7 @@ def test_stream_node():
 
     class TimerNode(StreamNode):
         def __init__(self, name, count, duration, cost = 0):
-            super().__init__(name, cost = cost)   
+            super().__init__(name=name, cost = cost)
             self.count = count
             self.duration = duration
 
@@ -239,19 +255,19 @@ def test_stream_node():
 
     aNode = TimerNode("a", 10, 1, cost = 1)
     bNode = RangeNode("b", 20, 30, cost = 1)
-    root = SumNode("c", [aNode, bNode], cost = 3)
+    root = SumNode(aNode, bNode, name="c", cost = 3)
     [print(x) for x in root]
 
     print_header("timer trigger sync subgraph")
 
     def subgraph():
-        a = Node("a", fn = lambda r: 1)
-        b = Node("b", fn = lambda r: 2)
-        c = Node("c", dependencies=[a,b], fn = lambda r: sum(r))
+        a = Node(1, name="a")
+        b = Node(name="b", fn = lambda r: 2)
+        c = Node(a, b, name="c", fn = lambda r: sum(r))
         return c
 
     aNode = TimerNode("s_a", 10, 1, cost = 1)
-    root = StreamNode("s_b", dependencies=[aNode], fn = lambda r: subgraph().apply())
+    root = StreamNode(aNode, "s_b", fn = lambda r: subgraph().apply())
     [print(x) for x in root]
 
     print_header("timer trigger async subgraph")
@@ -279,7 +295,7 @@ def test_processing_stream_nodes():
 
     class TimerProcessingNode(StreamNode):
         def __init__(self, name, count, duration, cost = 0):
-            super().__init__(name, cost = cost)   
+            super().__init__(name, cost = cost)
             self.count = count
             self.duration = duration
 
@@ -296,4 +312,7 @@ def test_processing_stream_nodes():
 
     asyncio.run(tasks)
 
-    
+
+
+if __name__ == '__main__':
+    unittest.main()
