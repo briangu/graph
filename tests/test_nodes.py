@@ -29,18 +29,21 @@ async def run_graph(root):
 def count_nodes(node):
     return len(node.traverse())
 
-def map_nodes(node):
-    return {n.name: i for i, n in enumerate(node.traverse())}
+# def get_node_key(n, i):
+#     return n.name if isinstance(n, Node) else f"n_{i}"
 
-def build_adj_matrix(node, node_map, adj_mat = None):
-    if adj_mat is None:
-        n = len(node_map.keys())
-        adj_mat = [[0]*n for _ in range(n+1)]
-    for n in node.traverse():
-        m = node_map[n.name]
-        for d in n.dependencies:
-            adj_mat[m][node_map[d.name]] = d.cost()
-    return adj_mat
+# def map_nodes(node):
+#     return {n.name if isinstance(n,Node) else f"n_{i}": i for i, n in enumerate(node.traverse())}
+
+# def build_adj_matrix(node, node_map, adj_mat = None):
+#     if adj_mat is None:
+#         n = len(node_map.keys())
+#         adj_mat = [[0]*n for _ in range(n+1)]
+#     for i,n in enumerate(node.traverse()):
+#         m = node_map[n.name]
+#         for d in n.dependencies:
+#             adj_mat[m][node_map[get_node_key(n, i)]] = d.cost()
+#     return adj_mat
 
 def print_header(str):
     print()
@@ -96,6 +99,10 @@ def get_cache_node_graph():
 
 
 class TestSyncNode(unittest.TestCase):
+    def test_node_name(self):
+        a = Node(name="a")
+        self.assertEqual(a.name, "a")
+
     def test_simple_node(self):
         a = Node(1, name="a")
         self.assertEqual(a.name, "a")
@@ -103,29 +110,29 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(b.name, "b")
         c = Node(a, name="c")
         self.assertEqual(c.name, "c")
-        self.assertEqual(a.apply(), b.apply())
-        self.assertEqual(a.apply(), c.apply())
+        self.assertEqual(a(), b())
+        self.assertEqual(a(), c())
 
 
     def test_sync_node(self):
         print_header("testing sync node graphs:")
 
         root = get_test_graph()
-        node_map = map_nodes(root)
-        n = len(node_map.keys())
+        # node_map = map_nodes(root)
+        # n = len(node_map.keys())
 
-        print("node count: {}".format(n))
-        print(node_map)
+        # print("node count: {}".format(n))
+        # print(node_map)
         print_nodes(root)
 
-        adj_matrix = build_adj_matrix(root, node_map)
-        print(adj_matrix)
+        # adj_matrix = build_adj_matrix(root, node_map)
+        # print(adj_matrix)
 
         print("total cost: {}".format(root.cost()))
 
-        [print(d.name) for d in root.traverse()]
+        # [print(d.name) for d in root.traverse()]
 
-        r = root.apply()
+        r = root()
         print(f"result: {r}")
         self.assertEqual(r, 1)
 
@@ -133,16 +140,16 @@ class TestSyncNode(unittest.TestCase):
         print_header("running min graph")
 
         root = get_min_cost_graph()
-        self.assertEqual(root.apply(), 1)
+        self.assertEqual(root(), 1)
 
     def test_cache_node(self):
         root = get_cache_node_graph()
         print_header("running with cache node: pass 1")
         print("total cost: {}".format(root.cost()))
-        root.apply()
+        root()
         print_header("running with cache node: pass 2")
         print("total cost: {}".format(root.cost()))
-        root.apply()
+        root()
 
 
 def test_async_node():
@@ -267,7 +274,7 @@ def test_stream_node():
         return c
 
     aNode = TimerNode("s_a", 10, 1, cost = 1)
-    root = StreamNode(aNode, "s_b", fn = lambda r: subgraph().apply())
+    root = StreamNode(aNode, "s_b", fn = lambda r: subgraph()())
     [print(x) for x in root]
 
     print_header("timer trigger async subgraph")

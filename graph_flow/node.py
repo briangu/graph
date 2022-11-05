@@ -42,6 +42,9 @@ class Node():
     def apply(self):
         return self.post_process(self.dependency_tasks())
 
+    def __call__(self, *args, **kwds):
+        return self.apply()
+
     async def __aiter__(self):
         yield await self.aapply()
 

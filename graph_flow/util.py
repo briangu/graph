@@ -6,11 +6,13 @@ def print_nodes(node, include_costs=False):
             child_indent = indent + "|"
         else:
             child_indent = indent + " "
+        name = node.name if isinstance(node, Node) else node
         if include_costs:
-            print("{}{} [{}: (node){} + (deps){}]".format(indent, node.name, node.cost(), node.process_cost(), node.dependencies_cost()))
+            print("{}{} [{}: (node){} + (deps){}]".format(indent, name, node.cost(), node.process_cost(), node.dependencies_cost()))
         else:
-            print("{}{}".format(indent, node.name))
-        [_print_nodes(d, child_indent, len(node.dependencies)-i) for i,d in enumerate(node.dependencies)]
+            print("{}{}".format(indent, name))
+        if isinstance(node, Node):
+            [_print_nodes(d, child_indent, len(node.dependencies)-i) for i,d in enumerate(node.dependencies)]
 
     _print_nodes(node)
 
