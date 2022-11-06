@@ -42,6 +42,12 @@ class Node():
     def apply(self):
         return self.post_process(self.dependency_tasks())
 
+    def __or__(self, func):
+        return func(self())
+
+    def __add__(self, value):
+        return Node(*self.dependencies, value)
+
     def __call__(self, *args, **kwds):
         return self.apply()
 
