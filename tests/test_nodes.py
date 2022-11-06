@@ -110,8 +110,14 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(b.name, "b")
         c = Node(a, name="c")
         self.assertEqual(c.name, "c")
+        d = Node(lambda: 1, name="d")
+        self.assertEqual(d.name, "d")
+        e = Node(1)
+        self.assertEqual(e.name, None)
         self.assertEqual(a(), b())
         self.assertEqual(a(), c())
+        self.assertEqual(a(), d())
+        self.assertEqual(a(), e())
 
     def test_simple_cost(self):
         a = Node(cost=1)
