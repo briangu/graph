@@ -138,7 +138,7 @@ class TestSyncNode(unittest.TestCase):
         x = (Node(1) + Node(2)) | (lambda x: sum(x()))
         self.assertTrue(isinstance(x, Node))
         self.assertEqual(x(), 3)
-        y = (Node(1, cost=10) + Node(2, cost=20) + Node(3, cost=30))
+        y = (Node(1) @ 10 + Node(2) @ 20 + Node(3) @ 30)
         self.assertTrue(isinstance(y, Node))
         self.assertEqual(y.dependencies_cost(), 60)
         y = y | (lambda x: sum(x()))
