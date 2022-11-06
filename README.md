@@ -13,6 +13,10 @@ Of course you can represent compute using native language constructs (such as co
 5. Cache support for nodes to prevent recomputation / fetching
 6. Alternative ergonomics for computation graph construction
 
+# Install
+
+    pip install graph-comp
+
 # Examples
 
 Graph Comp provides a bunch of ways to construct graphs based on the desired ergonimics.
