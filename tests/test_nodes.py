@@ -129,6 +129,8 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(c(), [1,2])
         d = c | (lambda x: sum(x()))
         self.assertEqual(d(), 3)
+
+    def test_chain_boxing(self):
         e = Node(3) + 4
         self.assertEqual(sum(e()), 7)
 
