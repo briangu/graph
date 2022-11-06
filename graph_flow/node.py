@@ -9,7 +9,7 @@ class Node():
         return arr[0] if len(arr) == 1 else arr
 
     def __init__(self, *deps, name = None, cost = None, fn = None):
-        self.deps = deps
+        self.deps = list(deps) if type(deps) == tuple else deps
         self.name = name
         self.fn_cost = cost or 0
         self.fn = fn or Node.__flatten
@@ -20,8 +20,9 @@ class Node():
     def traverse(self):
         def recursive_iter(node):
             yield node
-            for d in node.dependencies:
-                yield from recursive_iter(d)
+            for d in node.deps:
+                if isinstance(d, Node):
+                    yield from recursive_iter(d)
         yield from recursive_iter(self)
 
     def dependency_results(self):
@@ -42,8 +43,17 @@ class Node():
     def apply(self):
         return self.post_process(self.dependency_results())
 
-    def __or__(self, func):
-        return Node(func(self))
+    def __or__(self, value):
+        if type(value) == types.FunctionType:
+            return Node(value(self))
+        elif isinstance(value, Node):
+            value.deps.append(self)
+            return value
+        raise RuntimeError(f"unknown value: {value}")
+
+    def __mod__(self, name):
+        self.name = name
+        return self
 
     def __add__(self, value):
         value = value if isinstance(value, Node) else Node(value)
@@ -54,6 +64,9 @@ class Node():
         return self
 
     def __call__(self, *args, **kwds):
+        if len(args) and len([x for x in args if not isinstance(x, Node)]) == 0:
+            self.deps.extend(args)
+            return self
         return self.apply()
 
     def pretty_print(self, include_costs=False):
@@ -62,12 +75,39 @@ class Node():
                 child_indent = indent + "|"
             else:
                 child_indent = indent + " "
-            name = node.name if isinstance(node, Node) else node
+            name = (node.name if isinstance(node, Node) else node) or ""
             if include_costs:
-                print("{}{} [{}: (node){} + (deps){}]".format(indent, name, node.cost(), node.process_cost(), node.dependencies_cost()))
+                print("{}{} cost={} [(node){} + (deps){}]".format(indent, name, node.cost(), node.process_cost(), node.dependencies_cost()))
             else:
                 print("{}{}".format(indent, name))
             if isinstance(node, Node):
                 [_print_nodes(d, child_indent, len(node.deps)-i) for i,d in enumerate(node.deps)]
 
         _print_nodes(self)
+
+
+
+class Graph():
+
+    def __init__(self, inputs, outputs, name=None):
+        self.inputs = inputs
+        self.outputs = outputs
+        self.name = name
+
+    def summary(self):
+        print(f"Graph: {self.name}  Cost: {self.cost()}")
+        print("-"*80)
+        self.outputs.pretty_print(include_costs=True)
+        print("-"*80)
+
+    def cost(self):
+        return self.outputs.cost()
+
+    def __call__(self, *args, **kwargs):
+        o = self.inputs.deps
+        self.inputs.deps = list(args) if type(args) == tuple else args
+        try:
+            r = self.outputs()
+        finally:
+            self.inputs.deps = o
+        return r

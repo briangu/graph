@@ -1,8 +1,6 @@
-# graph
-python async cost based graph library
+# graph flow
 
+# Examples
 
-# 3 kinds of nodes
-# synchronous
-# async
-# streaming
+a = Node(1)
+

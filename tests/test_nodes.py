@@ -1,47 +1,8 @@
 import unittest
 
-import time
-
 from graph_flow.node import *
 from graph_flow.util import MinCostNode, CacheNode
 
-
-# if not self.fn:
-#     await asyncio.sleep(self.process_cost() / 10)
-class SlowNode(Node):
-
-    def __init__(self, node):
-        name = "s_{}".format(node.name)
-        deps = [SlowNode(d) for d in node.dependencies]
-        super().__init__(*deps, name = name, cost = node.cost, fn = node.fn)
-        self.node = node
-
-    def post_process(self, res):
-        time.sleep(self.fn_cost / 10)
-        return super().post_process(res)
-
-
-async def run_graph(root):
-    return await root.aapply()
-
-def count_nodes(node):
-    return len(node.traverse())
-
-# def get_node_key(n, i):
-#     return n.name if isinstance(n, Node) else f"n_{i}"
-
-# def map_nodes(node):
-#     return {n.name if isinstance(n,Node) else f"n_{i}": i for i, n in enumerate(node.traverse())}
-
-# def build_adj_matrix(node, node_map, adj_mat = None):
-#     if adj_mat is None:
-#         n = len(node_map.keys())
-#         adj_mat = [[0]*n for _ in range(n+1)]
-#     for i,n in enumerate(node.traverse()):
-#         m = node_map[n.name]
-#         for d in n.dependencies:
-#             adj_mat[m][node_map[get_node_key(n, i)]] = d.cost()
-#     return adj_mat
 
 def print_header(str):
     print()
@@ -100,13 +61,21 @@ class TestSyncNode(unittest.TestCase):
     def test_name(self):
         a = Node(name="a")
         self.assertEqual(a.name, "a")
+        a = Node() % "a"
+        self.assertEqual(a.name, "a")
 
     def test_eval(self):
         x = Node(1)
         self.assertEqual(x.apply(), 1)
         self.assertEqual(x.apply(), x())
 
-    def test_simple_node(self):
+    def test_fn(self):
+        a = Node(name="a", fn=lambda x: 1)
+        self.assertEqual(a(), 1)
+        b = a | Node(name="b", fn=lambda x: x[0] * 2)
+        self.assertEqual(b(), 2)
+
+    def test_dep_types(self):
         a = Node(1, name="a")
         self.assertEqual(a.name, "a")
         b = Node(name="b", fn=lambda _: 1)
@@ -122,7 +91,15 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(a(), d())
         self.assertEqual(a(), e())
 
-    def test_chain(self):
+    def test_functional_composition(self):
+        a = Node(1, name="a")
+        b = Node(2, name="b")
+        c = Node(3, name="c", fn=lambda x: sum(x))(a)
+        self.assertEqual(c(), 4)
+        c = Node(3, name="c", fn=lambda x: sum(x))(a, b)
+        self.assertEqual(c(), 6)
+
+    def test_combine_function(self):
         a = Node(1)
         b = Node(2)
         c = (a + b)
@@ -130,15 +107,50 @@ class TestSyncNode(unittest.TestCase):
         d = c | (lambda x: sum(x()))
         self.assertEqual(d(), 3)
 
-    def test_chain_boxing(self):
+    def test_combine_boxing(self):
         e = Node(3) + 4
         self.assertEqual(sum(e()), 7)
 
-    def test_pipe(self):
-        x = (Node(1) + Node(2)) | (lambda x: sum(x()))
+    def test_pipe_function(self):
+        x = Node(1, 2) | (lambda x: sum(x()))
         self.assertTrue(isinstance(x, Node))
         self.assertEqual(x(), 3)
-        y = (Node(1) @ 10 + Node(2) @ 20 + Node(3) @ 30)
+        y = Node(1) @ 10 + Node(2) @ 20 + Node(3) @ 30
+        self.assertTrue(isinstance(y, Node))
+        self.assertEqual(y.dependencies_cost(), 60)
+        y = y | (lambda x: sum(x()))
+        self.assertEqual(y(), 6)
+        z = y | (lambda x: x() ** 2)
+        self.assertTrue(isinstance(z, Node))
+        self.assertEqual(z(), 36)
+
+    def test_pipe_node(self):
+        x = Node(1)
+        y = Node(2)
+        self.assertFalse(x in y.deps)
+        z = x | y
+        self.assertEqual(y, z)
+        self.assertTrue(x in y.deps)
+
+    def test_pipe_node_multi(self):
+        a = Node(1, name="a")
+        b = Node(2, name="b")
+        c = b | Node(name="c", fn=lambda x: x[0] * 3)
+        self.assertEqual(c(), 6)
+        d = (a + c) % "a + c" | Node(name="d", fn=lambda x: sum(x[0]))
+        r = d()
+        self.assertEqual(r, 7)
+        e = Node(name="d", fn=lambda x: sum(x))
+        e = a | e
+        e = c | e
+        r = e()
+        self.assertEqual(r, 7)
+
+    def test_pipe_function(self):
+        x = Node(1, 2) | (lambda x: sum(x()))
+        self.assertTrue(isinstance(x, Node))
+        self.assertEqual(x(), 3)
+        y = Node(1) @ 10 + Node(2) @ 20 + Node(3) @ 30
         self.assertTrue(isinstance(y, Node))
         self.assertEqual(y.dependencies_cost(), 60)
         y = y | (lambda x: sum(x()))
@@ -178,27 +190,10 @@ class TestSyncNode(unittest.TestCase):
         d = MinCostNode(a, b, c, cost=4)
         self.assertEqual(d.cost(), a.cost() + 4)
 
-    def test_sync_node(self):
-        print_header("testing sync node graphs:")
-
+    def test_graph_cost(self):
         root = get_test_graph()
-        # node_map = map_nodes(root)
-        # n = len(node_map.keys())
-
-        # print("node count: {}".format(n))
-        # print(node_map)
-        # print_nodes(root)
-        root.pretty_print()
-
-        # adj_matrix = build_adj_matrix(root, node_map)
-        # print(adj_matrix)
-
-        print("total cost: {}".format(root.cost()))
-
-        # [print(d.name) for d in root.traverse()]
-
+        self.assertEqual(root.cost(), sum([x.process_cost() for x in root.traverse()]))
         r = root()
-        print(f"result: {r}")
         self.assertEqual(r, 1)
 
     def test_min_cost_node(self):
@@ -216,6 +211,14 @@ class TestSyncNode(unittest.TestCase):
         print("total cost: {}".format(root.cost()))
         root()
 
+    def test_graph(self):
+        a = Node(name='inputs', cost=1)
+        b = Node(name="b", cost=3, fn=lambda x: sum(x[0]) if type(x[0]) == list else sum(x))(a)
+        g = Graph(inputs=a, outputs=b, name="g")
+        self.assertEqual(g.cost(), 4)
+        g.summary()
+        self.assertEqual(g(1), 1)
+        self.assertEqual(g(1,2,3), 6)
 
 if __name__ == '__main__':
     unittest.main()
