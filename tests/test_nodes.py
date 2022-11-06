@@ -137,6 +137,8 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(x(), 3)
         y = (Node(1) + Node(2) + Node(3)) | (lambda x: sum(x()))
         self.assertEqual(y(), 6)
+        z = y | (lambda x: x() ** 2)
+        self.assertEqual(z(), 36)
 
     def test_simple_cost(self):
         a = Node(cost=1)
