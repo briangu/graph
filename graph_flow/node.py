@@ -25,7 +25,7 @@ class Node():
         yield from recursive_iter(self)
 
     def dependency_tasks(self):
-        return [d.apply() if isinstance(d, Node) else d() if type(d) == types.FunctionType else d for d in self.dependencies]
+        return [d() if isinstance(d, Node) or type(d) == types.FunctionType else d for d in self.dependencies]
 
     def dependencies_cost(self):
         return sum([d.cost() if isinstance(d, Node) else 0 for d in self.dependencies])

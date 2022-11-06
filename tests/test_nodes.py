@@ -103,6 +103,10 @@ class TestSyncNode(unittest.TestCase):
         a = Node(name="a")
         self.assertEqual(a.name, "a")
 
+    def test_eval(self):
+        x = Node(1)
+        self.assertEqual(x.apply(), x())
+
     def test_simple_node(self):
         a = Node(1, name="a")
         self.assertEqual(a.name, "a")
