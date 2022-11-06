@@ -1,7 +1,7 @@
 import unittest
 
-from graph_flow.node import *
-from graph_flow.util import MinCostNode, CacheNode
+from graph_comp.node import *
+from graph_comp.util import MinCostNode, CacheNode
 
 
 def print_header(str):

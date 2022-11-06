@@ -1,10 +1,10 @@
 from setuptools import setup
 
 setup(
-    name='graph_flow',
-    packages=['graph_flow'],
-    version='0.1.0',
-    description='Cost based graph data flow library',
+    name='graph_comp',
+    packages=['graph_comp'],
+    version='0.2.0',
+    description='Simple computation graph library with cost support.',
     author='Brian Guarraci',
     license='MIT',
     setup_requires=['pytest-runner'],

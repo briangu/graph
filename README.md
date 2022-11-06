@@ -1,6 +1,6 @@
-# Graph Flow
+# Graph Comp
 
-Graph Flow is a simple library that lets you construct DAG synchronous computation graphs in various ways.
+Graph Comp is a simple library that lets you construct DAG synchronous computation graphs in various ways.
 
 It's loosely inspired by https://github.com/twitter/nodes, which I designed the v1 of.  Twitter nodes was used to represent search execution graphs, making it easy for data scientists to create new search experiences.
 
@@ -15,7 +15,7 @@ Of course you can represent compute using native language constructs (such as co
 
 # Examples
 
-Graph flow provides a bunch of ways to construct graphs based on the desired ergonimics.
+Graph Comp provides a bunch of ways to construct graphs based on the desired ergonimics.
 
 For these examples, assume we have temperature timeseries data and we want to compute some stats about it: min, max, and average temps.
 

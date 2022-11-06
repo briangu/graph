@@ -1,5 +1,4 @@
-from graph_flow.node import *
-# from graph_flow.util import MinCostNode, CacheNode
+from graph_comp.node import *
 
 
 class MinNode(Node):
