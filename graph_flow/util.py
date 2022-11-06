@@ -1,21 +1,5 @@
 from .node import Node
 
-def print_nodes(node, include_costs=False):
-    def _print_nodes(node, indent = "", siblingCount = 0):
-        if siblingCount > 1:
-            child_indent = indent + "|"
-        else:
-            child_indent = indent + " "
-        name = node.name if isinstance(node, Node) else node
-        if include_costs:
-            print("{}{} [{}: (node){} + (deps){}]".format(indent, name, node.cost(), node.process_cost(), node.dependencies_cost()))
-        else:
-            print("{}{}".format(indent, name))
-        if isinstance(node, Node):
-            [_print_nodes(d, child_indent, len(node.dependencies)-i) for i,d in enumerate(node.dependencies)]
-
-    _print_nodes(node)
-
 
 class TraceNode(Node):
 
@@ -33,13 +17,13 @@ class TraceNode(Node):
 
 class MinCostNode(Node):
     def min_dependency(self):
-        if not self.dependencies:
+        if not self.deps:
             return 0, None
-        return min((n.cost() if isinstance(n, Node) else 0, i) for (i, n) in enumerate(self.dependencies))
+        return min((n.cost() if isinstance(n, Node) else 0, i) for (i, n) in enumerate(self.deps))
 
-    def dependency_tasks(self):
+    def dependency_results(self):
         _, i = self.min_dependency()
-        return [self.dependencies[i]()] if i else []
+        return [self.deps[i]()] if i else []
 
     def dependencies_cost(self):
         return self.min_dependency()[0]
