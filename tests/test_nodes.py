@@ -129,6 +129,8 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(c(), [1,2])
         d = c | (lambda x: sum(x()))
         self.assertEqual(d(), 3)
+        e = Node(3) + 4
+        self.assertEqual(sum(e()), 7)
 
     def test_pipe(self):
         x = (Node(1) + Node(2)) | (lambda x: sum(x()))

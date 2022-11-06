@@ -46,6 +46,7 @@ class Node():
         return Node(func(self))
 
     def __add__(self, value):
+        value = value if isinstance(value, Node) else Node(value)
         return Node(self, value) if self.fn != Node.__flatten or self.process_cost() != 0 else Node(*self.deps, value)
 
     def __matmul__(self, value):
