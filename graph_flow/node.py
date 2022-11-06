@@ -94,10 +94,10 @@ class Graph():
         self.outputs = outputs
         self.name = name
 
-    def summary(self):
+    def summary(self, include_costs=False):
         print(f"Graph: {self.name}  Cost: {self.cost()}")
         print("-"*80)
-        self.outputs.pretty_print(include_costs=True)
+        self.outputs.pretty_print(include_costs=include_costs)
         print("-"*80)
 
     def cost(self):
