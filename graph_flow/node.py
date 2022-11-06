@@ -43,7 +43,7 @@ class Node():
         return self.post_process(self.dependency_tasks())
 
     def __or__(self, func):
-        return func(self())
+        return Node(func(self))
 
     def __add__(self, value):
         return Node(*self.dependencies, value)

@@ -129,14 +129,14 @@ class TestSyncNode(unittest.TestCase):
         b = Node(2)
         c = (a + b)
         self.assertEqual(c(), [1,2])
-        d = c | (lambda x: sum(x))
-        self.assertEqual(d, 3)
+        d = c | (lambda x: sum(x()))
+        self.assertEqual(d(), 3)
 
     def test_pipe(self):
-        x = (Node(1) + Node(2)) | (lambda x: sum(x))
-        self.assertEqual(x, 3)
-        y = (Node(1) + Node(2) + Node(3)) | (lambda x: sum(x))
-        self.assertEqual(y, 6)
+        x = (Node(1) + Node(2)) | (lambda x: sum(x()))
+        self.assertEqual(x(), 3)
+        y = (Node(1) + Node(2) + Node(3)) | (lambda x: sum(x()))
+        self.assertEqual(y(), 6)
 
     def test_simple_cost(self):
         a = Node(cost=1)
