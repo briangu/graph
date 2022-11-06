@@ -155,11 +155,15 @@ class TestSyncNode(unittest.TestCase):
         a = Node(lambda: 9, cost=1)
         self.assertEqual(a.cost(), 1)
 
+        a = Node(lambda: 9) @ 1
+        self.assertEqual(a.cost(), 1)
+
+
     def test_complex_cost(self):
-        a = Node(cost=1)
-        b = Node(cost=2)
-        c = Node(cost=3)
-        d = Node(a, b, c, cost=4)
+        a = Node() @ 1
+        b = Node() @ 2
+        c = Node() @ 3
+        d = (a + b + c) @ 4
         self.assertEqual(d.dependencies_cost(), a.cost() + b.cost() + c.cost())
         self.assertEqual(d.cost(), a.cost() + b.cost() + c.cost() + 4)
 

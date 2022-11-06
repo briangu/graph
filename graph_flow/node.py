@@ -48,6 +48,10 @@ class Node():
     def __add__(self, value):
         return Node(self, value) if self.fn != Node.__flatten or self.process_cost() != 0 else Node(*self.deps, value)
 
+    def __matmul__(self, value):
+        self.fn_cost = value
+        return self
+
     def __call__(self, *args, **kwds):
         return self.apply()
 
