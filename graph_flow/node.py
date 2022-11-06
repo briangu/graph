@@ -45,7 +45,7 @@ class Node():
 
     def __or__(self, value):
         if type(value) == types.FunctionType:
-            return Node(value(self))
+            return Node(self, fn=value)
         elif isinstance(value, Node):
             value.deps.append(self)
             return value

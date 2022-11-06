@@ -104,7 +104,7 @@ class TestSyncNode(unittest.TestCase):
         b = Node(2)
         c = (a + b)
         self.assertEqual(c(), [1,2])
-        d = c | (lambda x: sum(x()))
+        d = c | (lambda x: sum(x[0]))
         self.assertEqual(d(), 3)
 
     def test_combine_boxing(self):
@@ -147,19 +147,16 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(r, 7)
 
     def test_pipe_function(self):
-        x = Node(1, 2) | (lambda x: sum(x()))
+        x = Node(1, 2) | (lambda x: sum(x[0]))
         self.assertTrue(isinstance(x, Node))
         self.assertEqual(x(), 3)
         y = Node(1) @ 10 + Node(2) @ 20 + Node(3) @ 30
         self.assertTrue(isinstance(y, Node))
         self.assertEqual(y.dependencies_cost(), 60)
-        y = y | (lambda x: sum(x()))
+        y = y | (lambda x: sum(x[0]))
         self.assertEqual(y(), 6)
-        z = y | (lambda x: x() ** 2)
+        z = y | (lambda x: x[0] ** 2)
         self.assertEqual(z(), 36)
-        z.fn_cost = 3
-        self.assertEqual(z.cost(), 3)
-
 
     def test_simple_cost(self):
         a = Node(cost=1)
