@@ -56,3 +56,4 @@ class Node():
         tasks = [d.aapply() for d in self.dependencies]
         res = await asyncio.gather(*tasks)
         return await self.apost_process(res)
+

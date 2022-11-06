@@ -35,16 +35,14 @@ class MinCostNode(Node):
     def min_dependency(self):
         if not self.dependencies:
             return 0, None
-        return min((n.cost(), i) for (i, n) in enumerate(self.dependencies))
+        return min((n.cost() if isinstance(n, Node) else 0, i) for (i, n) in enumerate(self.dependencies))
 
     def dependency_tasks(self):
         _, i = self.min_dependency()
-        min_dep = self.dependencies[i]
-        return [min_dep.apply()]
+        return [self.dependencies[i]()] if i else []
 
     def dependencies_cost(self):
-        v, _ = self.min_dependency()
-        return v
+        return self.min_dependency()[0]
 
 
 class CacheNode(Node):
@@ -58,26 +56,22 @@ class CacheNode(Node):
         return self.process_cost() + self.dependencies_cost() if not self.internal_cache else 0
 
     def set_cache(self, val):
-        print("set cache: {} {}".format(self.name, val))
         self.internal_cache = val
         return val
 
     def get_cache(self):
         val = self.internal_cache
-        print("get cache: {} {}".format(self.name, val))
         return val
 
     def apply(self):
         return self.get_cache() if self.internal_cache else self.set_cache(super().apply())
 
     async def aset_cache(self, val):
-        print("set cache: {} {}".format(self.name, val))
         self.internal_cache = val
         return val
 
     async def aget_cache(self):
         val = self.internal_cache
-        print("get cache: {} {}".format(self.name, val))
         return val
 
     async def aapply(self):

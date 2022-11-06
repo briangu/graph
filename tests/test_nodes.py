@@ -113,6 +113,30 @@ class TestSyncNode(unittest.TestCase):
         self.assertEqual(a(), b())
         self.assertEqual(a(), c())
 
+    def test_simple_cost(self):
+        a = Node(cost=1)
+        self.assertEqual(a.cost(), 1)
+
+        a = Node(9, cost=1)
+        self.assertEqual(a.cost(), 1)
+
+        a = Node(lambda: 9, cost=1)
+        self.assertEqual(a.cost(), 1)
+
+    def test_complex_cost(self):
+        a = Node(cost=1)
+        b = Node(cost=2)
+        c = Node(cost=3)
+        d = Node(a, b, c, cost=4)
+        self.assertEqual(d.dependencies_cost(), a.cost() + b.cost() + c.cost())
+        self.assertEqual(d.cost(), a.cost() + b.cost() + c.cost() + 4)
+
+    def test_min_choice_cost(self):
+        a = Node(cost=1)
+        b = Node(cost=2)
+        c = Node(cost=3)
+        d = MinCostNode(a, b, c, cost=4)
+        self.assertEqual(d.cost(), a.cost() + 4)
 
     def test_sync_node(self):
         print_header("testing sync node graphs:")
