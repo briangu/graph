@@ -2,7 +2,7 @@
 
 Graph Flow is a simple library that lets you construct DAG synchronous computation graphs in various ways.
 
-It's loosely based on https://github.com/twitter/nodes, which I designed the v1 of.  Twitter nodes was used to represent search execution graphs, making it easy for data scientists to create new search experiences.
+It's loosely inspired by https://github.com/twitter/nodes, which I designed the v1 of.  Twitter nodes was used to represent search execution graphs, making it easy for data scientists to create new search experiences.
 
 Of course you can represent compute using native language constructs (such as comprehensions), however there a few advantages that make an explicit graph representation appealing for some use cases:
 
